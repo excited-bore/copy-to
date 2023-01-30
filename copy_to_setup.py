@@ -58,6 +58,7 @@ help = subparser.add_parser('help')
 group = modify.add_mutually_exclusive_group()
 
 run.add_argument("name" , nargs='+', type=str ,help="Environment name", metavar="Environment Name")
+list.add_argument("name" , nargs='+', type=str ,help="Environment name", metavar="Environment Name")
 
 modify.add_argument("name" , type=str ,help="Environment name for modifications", metavar="Environment Name")
 modify.add_argument("dest" , nargs="?", type=lambda x: is_valid_file_or_dir(parser, x), help="Destination folder")
@@ -132,7 +133,6 @@ elif args.command == 'modify':
             raise SystemExit
 
         elif inJson:
-            print()
             print("Try a different name. " + name + " is already taken.")
             raise SystemExit
         else:
