@@ -1,20 +1,43 @@
 import os
 import shutil
 import json
+import sys
+import errno
 import argcomplete
 import argparse
 from pathlib import Path
 file=Path("/home/burp/.copy_to_confs.json")
 
+#try:
+#    os.rename('/etc/foo', '/etc/bar')
+#except IOError as e:
+#    print(e)
+#    if (e == errno.EPERM):
+#       sys.exit("You need root permissions to do this, laterz!")
+
 if not os.path.exists(file):
     with open(file, "w") as outfile:
         json.dump({}, outfile)
+
+def is_valid_dir(parser, arg):
+    if os.path.isdir(arg):
+        print('1' + arg)
+        return arg
+    elif os.path.isdir(os.path.join(os.getcwd(), arg)):
+        print('2' + os.path.join(os.getcwd(), arg))
+        return os.path.join(os.getcwd(), arg)
+    elif os.path.isfile(arg):
+        print('%s is a file. A folder is required' % arg)
+        raise SystemExit              
+    else:
+        print("The directory %s does not exist!" % arg)
+        raise SystemExit
 
 def is_valid_file_or_dir(parser, arg):
     if os.path.isdir(arg):
         return arg
     elif os.path.isfile(arg):
-        return arg             #open(arg, 'r')  # return an open file handle 
+        return arg              
     elif os.path.exists(os.path.join(os.getcwd(), arg)):
         return os.path.join(os.getcwd(), arg)
     else:
@@ -23,73 +46,69 @@ def is_valid_file_or_dir(parser, arg):
 
 def copy_to(dest, src):
 
-    exist_dest = ""
     for element in src:
 
+        exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
         if os.path.isfile(element):
-            exist_dest=os.path.join(dest, os.path.basename(element))
-            if os.path.isfile(exist_dest):
-                shutil.copy2(element, exist_dest)
-            else:
-                shutil.copy2(element, dest)
-            print("Copied " + str(exist_dest))
+            shutil.copy2(element, exist_dest)
+            print("Copied to " + str(exist_dest))
 
         elif os.path.isdir(element):
-            exist_dest=os.path.join(dest, os.path.basename(element))
             shutil.copytree(element, exist_dest, dirs_exist_ok=True)
-            print("Copied " + str(exist_dest) + " and all it's content")
-
-def get_src(src):
-    return list(str(e) for e in src)
+            print("Copied to " + str(exist_dest) + " and all it's inner content")
 
 with open(file, 'r') as outfile:
     envs = json.load(outfile)
 
-parser = argparse.ArgumentParser(description="Setup environments to copy files and directories to",
+parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 subparser = parser.add_subparsers(dest='command')
-run = subparser.add_parser('run')
 list = subparser.add_parser('list')
+run = subparser.add_parser('run')
 #subparser.add_parser('run').completer = argcomplete.
-modify = subparser.add_parser('modify')
+add = subparser.add_parser('add')
+delete = subparser.add_parser('delete')
+add_source = subparser.add_parser('add_source')
+reset_destination = subparser.add_parser('reset_destination')
+reset_source = subparser.add_parser('reset_source')
 #subparser.add_parser('modify').completer = EnvironCompleter
 
 help = subparser.add_parser('help')
-group = modify.add_mutually_exclusive_group()
-
-run.add_argument("name" , nargs='+', type=str ,help="Environment name", metavar="Environment Name")
-list.add_argument("name" , nargs='+', type=str ,help="Environment name", metavar="Environment Name")
-
-modify.add_argument("name" , type=str ,help="Environment name for modifications", metavar="Environment Name")
-modify.add_argument("dest" , nargs="?", type=lambda x: is_valid_file_or_dir(parser, x), help="Destination folder")
-modify.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
-modify.add_argument("-l", "--list", action='store_true', required=False, help="List environments")
-group.add_argument("-a", "--add", action='store_true', required=False, help="Add environment")
-group.add_argument("-d", "--delete", action='store_true', required=False, help="Delete environment")
-group.add_argument("-rd", "--remap_destination", action='store_true', required=False, help="Remap environment destination")
-group.add_argument("-as", "--append_source", action='store_true', required=False, help="Append to environment source")
-group.add_argument("-rs", "--remap_source", action='store_true', required=False, help="Remap environment source")
+list.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration Name")
+run.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
+delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
+add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+add.add_argument("name" , type=str ,help="Configuration name", metavar="Configuration Name")
+add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), help="Destination folder")
+add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
+add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
+reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), help="Destination folder")
+reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
 argcomplete.autocomplete(parser)
 args=parser.parse_args()
 name= args.name if "name" in args else ""
 dest= args.dest if "dest" in args else []
 src=args.src if "src" in args else []
 envs={}
-
                 
 with open(file, 'r') as outfile:
     envs = json.load(outfile)
 
-if args.command == "list" and not args.name == "":
-    for key, value in envs.items():
-        print(key + ":")
+def listAll():
+    for name, value in envs.items():
+        print(name + ":")
+        print("     dest:     '" + str(value['dest']) + "'")
+        print("     src:")
         for src in value['src']:
-            print("  '" + src + "'")
-elif args.command == "list":
-    for key, value in envs.items():
-        if key == name:
-            for src in value['src']:
-                print("  '" + src + "'")
+            print("          '" + str(src) + "'")
 
 if args.command == 'help':
     print("Positional argument 'modify' to configure")
@@ -99,134 +118,143 @@ if args.command == 'help':
 
 if args.command == 'run':
     if envs == {}:
-        print("Add an environment with modify -a first to copy all it's files to destination")
+        print("Add an configuration with modify -a first to copy all it's files to destination")
         raise SystemExit
-    elif name == "":
-        parser.print_help()
+    elif not 'name' in args:
+        print("Give up an configuration to copy objects between")
         raise SystemExit
     else:
+        for key in name:
+            if not key in envs:
+                print("Look again. " + key + " isn't in there.")
+                listAll()
+                raise SystemExit
         for i in name:
             i=str(i)
             dest = envs[i]['dest']
             src = envs[i]['src']
             copy_to(dest, src)
+elif args.command == 'add':
+    print(dest)
+    print(src)
+    if not 'name' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif name in envs:
+        print("Look again. " + name + " is/are already used as names.")
+        listAll()
+        raise SystemExit
+    elif dest == []:
+        print("Give up an destination folder to copy objects between")
+        raise SystemExit    
+    elif src == []:
+        print("Give up a list of source files and/or folder to copy objects between")
+        raise SystemExit
+    elif str(dest) in src:
+        print('Destination and source can"t be one and the same')
+        raise SystemExit
+    else:
+        with open(file, 'w') as outfile: 
+            envs[str(name)] = { 'dest' : str(dest), 'src' : [*src] }
+            json.dump(envs, outfile)
 
-elif args.command == 'modify':
+elif args.command == 'delete':
+    if not 'name' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif envs == {} or os.stat(file).st_size == 0:
+        print("Add an configuration with -a, --add first to copy all it's files to destination")
+        raise SystemExit
+    else:
+        for key in name:
+            if not key in envs:
+                print("Look again. " + key + " isn't in there.")
+                listAll()
+                raise SystemExit
+        for key in name:
+            envs.pop(key)
+            if 'list' in args:
+                print(str(key) + ' removed from confs')
+        with open(file, 'w') as outfile:
+            json.dump(envs, outfile)
 
-    if args.add:
-        inJson=False
-        for key, value in envs.items():
-            for src in value['src']:
-                if src == name:
-                    inJson=True
-
-        if not name:
-            print("Give up an environment to copy objects between")
-            raise SystemExit
-        
-        elif not dest:
-            print("Give up an destination folder to copy objects between")
-            raise SystemExit
-        
-        elif not src:
-            print("Give up a list of source files and/or folder to copy objects between")
-            raise SystemExit
-
-        elif inJson:
-            print("Try a different name. " + name + " is already taken.")
-            raise SystemExit
-        else:
-            with open(file, 'w') as outfile: 
-                envs[str(name)] = { 'dest' : str(dest), 'src' : get_src(src) }
-                json.dump(envs, outfile)
-
-    elif args.delete:
-        inJson=False
-        for key, value in envs.items():
-            for src in value['src']:
-                if src == name:
-                    inJson=True
-        if not inJson:
-            print("Look again. " + name + " isn't in there.")
-            raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an environment with -a, --add first to copy all it's files to destination")
-            raise SystemExit
-
-        else:
-            with open(file, 'w') as outfile:
-                envs.pop(name)
-                json.dump(envs, outfile)
-
-    elif args.remap_destination:
-        inJson=False
-        for key, value in envs.items():
-            for src in value['src']:
-                if src == name:
-                    inJson=True
-        if not name:
-            print("Give up an environment to copy objects between")
-            raise SystemExit
-        elif not dest:
-            print("Give up an destination folder to copy objects between")
-            raise SystemExit
-        elif not inJson:
-            print("Look again. " + name + " isn't in there.")
-            raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an environment with -a, --add first to copy all it's files to destination")
-            raise SystemExit
-        else:
-            with open(file, 'w') as outfile:
-                envs[name].update({ "dest" : dest})
-                json.dump(envs, outfile)
-
-    elif args.remap_source:
-        src = [dest] + src
-        inJson=False
-        for key, value in envs.items():
-            for src in value['src']:
-                if src == name:
-                    inJson=True
-        if not name:
-            print("Give up an environment to copy objects between")
-            raise SystemExit
-        elif not src:
-            print("Give up a new set of source files and folders to copy objects between")
-            raise SystemExit
-        elif not inJson:
-            print("Look again. " + name + " isn't in there.")
-            raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an environment with -a, --add first to copy all it's files to destination")
-            raise SystemExit
-        else:
-            with open(file, 'w') as outfile:
-                envs[name].update({ "src" : get_src(src) })
-                json.dump(envs, outfile)
-
-    elif args.append_source:
-        src = [dest] + src
-        inJson=False
-        for key, value in envs.items():
-            for src in value['src']:
-                if src == name:
-                    inJson=True
-        if not name:
-            print("Give up an environment to copy objects between")
-            raise SystemExit
-        elif not src:
-            print("Give up a new set of source files and folders to copy objects between")
-            raise SystemExit
-        elif not inJson:
-            print("Look again. " + name + " isn't in there.")
-            raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an environment with -a, --add first to copy all it's files to destination")
-            raise SystemExit
-        else:
-            with open(file, 'w') as outfile:
-                src = get_src(src)
-                for i in src:
+elif args.command == 'add_source':
+    if not 'name' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif not 'src' in args:
+        print("Give up a new set of source files and folders to copy objects between")
+        raise SystemExit
+    elif envs == {} or os.stat(file).st_size == 0:
+        print("Add an configuration with -a, --add first to copy all it's files to destination")
+        raise SystemExit
+    elif not name in envs:
+        print("Look again. " + name + " isn't in there.")
+        listAll()
+        raise SystemExit
+    elif envs[name]['dest'] in src:
+        print('Destination and source can"t be one and the same')
+        raise SystemExit
+    else:
+        src = [*src]
+        with open(file, 'w') as outfile:
+            for i in src:
+                if i in envs[name]['src']:
+                    print(str(i) + " already in source of " + str(name))
+                else:
                     envs[name]["src"].append(i)
-                json.dump(envs, outfile)
+                    print('Added' + str(i) + ' to source of ' + str(name))
+            json.dump(envs, outfile)
+
+elif args.command == 'reset_destination':
+    if not 'name' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif not 'dest' in args:
+        print("Give up a new destination folder to copy objects between")
+        raise SystemExit
+    elif envs == {} or os.stat(file).st_size == 0:
+        print("Add an configuration with -a, --add first to copy all it's files to destination")
+        raise SystemExit
+    elif not name in envs:
+        print("Look again. " + name + " isn't in there.")
+        raise SystemExit
+    else:
+        with open(file, 'w') as outfile:
+            envs[name]['dest'] = str(dest)
+            print(envs)
+            json.dump(envs, outfile)
+        print('Reset destination of '+ str(name) +' to', dest)
+
+elif args.command == 'reset_source':
+    if not 'name' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif not 'src' in args:
+        print("Give up a new set of source files and folders to copy objects between")
+        raise SystemExit
+    elif envs == {} or os.stat(file).st_size == 0:
+        print("Add an configuration with -a, --add first to copy all it's files to destination")
+        raise SystemExit
+    elif not name in envs:
+        print("Look again. " + name + " isn't in there.")
+        raise SystemExit
+    else:
+        with open(file, 'w') as outfile:
+            envs[name].update({ "src" : [*src] })
+            json.dump(envs, outfile)
+        print('Reset source of '+ str(name) + ' to', src)
+
+if not args.command == "list" and not 'list' in args:
+    parser.print_help()
+else: 
+    if not "name" in args or args.name == None:
+        listAll()
+    else:
+        for key, value in envs.items():
+            if name == key:
+                print(key + ":")
+                print("     dest:     '" + str(value['dest']) + "'")
+                print("         src:\n")
+                for src in value['src']:
+                    print("        '" + str(src) + "'")
