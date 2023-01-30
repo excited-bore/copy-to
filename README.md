@@ -7,3 +7,4 @@ Copy the files by running `python /path/to/copy_to_setup.py run myname`
 
 List configured paths and files with `python /path/to/copy_to_setup.py list myname` 
 or just `python /path/to/copy_to_setup.py list`
+Configuration files at `~/.copy_to_confs.json` Windows and mac not tested
