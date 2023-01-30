@@ -3,6 +3,7 @@ import shutil
 import json
 import sys
 import errno
+from itertools import chain
 import argcomplete
 import argparse
 from pathlib import Path
@@ -47,6 +48,21 @@ def copy_to(dest, src):
             shutil.copytree(element, exist_dest, dirs_exist_ok=True)
             print("Copied to " + str(exist_dest) + " and all it's inner content")
 
+def listAll():
+    for name, value in envs.items():
+        if not name == 'group':
+            print(name + ":")
+            print("     dest:     '" + str(value['dest']) + "'")
+            print("     src:")
+            for src in value['src']:
+                print("          '" + str(src) + "'")
+
+def filterListDoubles(a):
+    # https://stackoverflow.com/questions/9835762/how-do-i-find-the-duplicates-in-a-list-and-create-another-list-with-them
+    seen = set()
+    ret = [x for x in a if x not in seen and not seen.add(x)]
+    return ret
+
 with open(file, 'r') as outfile:
     envs = json.load(outfile)
 
@@ -59,11 +75,13 @@ run = subparser.add_parser('run')
 add = subparser.add_parser('add')
 delete = subparser.add_parser('delete')
 add_source = subparser.add_parser('add_source')
+add_group = subparser.add_parser('add_group')
+delete_group = subparser.add_parser('delete_group')
 reset_destination = subparser.add_parser('reset_destination')
 reset_source = subparser.add_parser('reset_source')
+help = subparser.add_parser('help')
 #subparser.add_parser('modify').completer = EnvironCompleter
 
-help = subparser.add_parser('help')
 list.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration Name")
 run.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
 run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
@@ -73,6 +91,11 @@ add.add_argument("-l", "--list", action='store_true', required=False, help="List
 add.add_argument("name" , type=str ,help="Configuration name", metavar="Configuration Name")
 add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), help="Destination folder")
 add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
+add_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name")
+add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
+delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name")
 add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
 add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
 add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
@@ -87,18 +110,14 @@ args=parser.parse_args()
 name= args.name if "name" in args else ""
 dest= args.dest if "dest" in args else []
 src=args.src if "src" in args else []
-envs={}
+if type(name) is list:
+    name = filterListDoubles(name)
+src = filterListDoubles(src)
                 
-with open(file, 'r') as outfile:
-    envs = json.load(outfile)
-
-def listAll():
-    for name, value in envs.items():
-        print(name + ":")
-        print("     dest:     '" + str(value['dest']) + "'")
-        print("     src:")
-        for src in value['src']:
-            print("          '" + str(src) + "'")
+if not 'group' in envs:
+    with open(file, 'w') as outfile: 
+        envs['group'] = []
+        json.dump(envs, outfile)
 
 if args.command == 'help':
     print("Positional argument 'run' to run config by name")
@@ -107,18 +126,33 @@ if args.command == 'help':
 
 if args.command == 'run':
     if envs == {}:
-        print("Add an configuration with modify -a first to copy all it's files to destination")
+        print("Add an configuration with 'copy_to add dest src' first to copy all it's files to destination")
         raise SystemExit
     elif not 'name' in args:
         print("Give up an configuration to copy objects between")
         raise SystemExit
     else:
+        var = []
+        grps = []
         for key in name:
+            if key in envs['group']:
+                var.append(envs['group'][key])
+                grps.append(key)
+        var1=[]
+        for i in var:
+            for e in i:
+                var1.append(e)
+        for key in name:
+            if not key in grps:
+                var1.append(key)
+        var1 = filterListDoubles(var1)
+        print(var1)
+        for key in var1:
             if not key in envs:
                 print("Look again. " + key + " isn't in there.")
                 listAll()
                 raise SystemExit
-        for i in name:
+        for i in var1:
             i=str(i)
             dest = envs[i]['dest']
             src = envs[i]['src']
@@ -127,22 +161,47 @@ elif args.command == 'add':
     if not 'name' in args:
         print("Give up an configuration to copy objects between")
         raise SystemExit
+    elif args.name == 'group':
+        print("Name 'group' is reserved to keep track of groupnames")
+        raise SystemExit
     elif name in envs:
-        print("Look again. " + name + " is/are already used as names.")
+        print("Look again. " + str(name) + " is/are already used as name.")
         listAll()
         raise SystemExit
-    elif dest == []:
-        print("Give up an destination folder to copy objects between")
-        raise SystemExit    
-    elif src == []:
-        print("Give up a list of source files and/or folder to copy objects between")
+    elif name in envs['group']:
+        print("Look again. " + str(name) + " is/are already used as groupname.")
+        listAll()
         raise SystemExit
     elif str(dest) in src:
-        print('Destination and source can"t be one and the same')
+        print("Destination and source can't be one and the same")
         raise SystemExit
     else:
         with open(file, 'w') as outfile: 
             envs[str(name)] = { 'dest' : str(dest), 'src' : [*src] }
+            json.dump(envs, outfile)
+
+elif args.command == 'add_group':
+    if not 'groupname' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif args.groupname == 'group':
+        print("Name 'group' is reserved to keep track of groupnames")
+        raise SystemExit
+    elif args.groupname in envs:
+        print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
+        raise SystemExit
+    elif args.groupname in envs['group']:
+        print("Change " + str(args.groupname) + ". It's already taken")
+        raise SystemExit
+    else:
+        for key in name:
+            if not key in envs:
+                print("Look again. " + key + " isn't in there.")
+                listAll()
+                raise SystemExit
+        with open(file, 'w') as outfile: 
+            envs['group'] = { args.groupname : name }
+            print(str(args.groupname) + ' added to confs')
             json.dump(envs, outfile)
 
 elif args.command == 'delete':
@@ -155,16 +214,36 @@ elif args.command == 'delete':
     else:
         for key in name:
             if not key in envs:
-                print("Look again. " + key + " isn't in there.")
+                print("Look again. '" + key + "' isn't in there.")
                 listAll()
                 raise SystemExit
         for key in name:
+            if name == 'group':
+                print("Don't try to break the script silly")
+                raise SystemExit
             envs.pop(key)
             if 'list' in args:
                 print(str(key) + ' removed from confs')
         with open(file, 'w') as outfile:
             json.dump(envs, outfile)
 
+elif args.command == 'delete_group':
+    if not 'groupname' in args:
+        print("Give up an configuration to copy objects between")
+        raise SystemExit
+    elif args.groupname == 'group':
+        print("Name 'group' is reserved to keep track of groupnames")
+        raise SystemExit
+    elif not args.groupname in envs['group']:
+        print("Look again." + str(args.groupname) + " is not in there")
+        listAll()
+        raise SystemExit
+    else:
+        envs['group'].pop(args.groupname)
+        print(str(args.groupname) + ' removed from confs')
+        with open(file, 'w') as outfile: 
+            json.dump(envs, outfile)
+            
 elif args.command == 'add_source':
     if not 'name' in args:
         print("Give up an configuration to copy objects between")
@@ -176,7 +255,7 @@ elif args.command == 'add_source':
         print("Add an configuration with -a, --add first to copy all it's files to destination")
         raise SystemExit
     elif not name in envs:
-        print("Look again. " + name + " isn't in there.")
+        print("Look again. " + str(name) + " isn't in there.")
         listAll()
         raise SystemExit
     elif envs[name]['dest'] in src:
@@ -204,7 +283,7 @@ elif args.command == 'reset_destination':
         print("Add an configuration with -a, --add first to copy all it's files to destination")
         raise SystemExit
     elif not name in envs:
-        print("Look again. " + name + " isn't in there.")
+        print("Look again. " + str(name) + " isn't in there.")
         raise SystemExit
     elif dest in envs[name]['src']:
         print('Destination and source can"t be one and the same')
@@ -226,7 +305,7 @@ elif args.command == 'reset_source':
         print("Add an configuration with -a, --add first to copy all it's files to destination")
         raise SystemExit
     elif not name in envs:
-        print("Look again. " + name + " isn't in there.")
+        print("Look again. " + str(name) + " isn't in there.")
         raise SystemExit
     elif envs[name]['dest'] in src:
         print('Destination and source can"t be one and the same')
@@ -237,12 +316,11 @@ elif args.command == 'reset_source':
             json.dump(envs, outfile)
         print('Reset source of '+ str(name) + ' to', src)
 
-if not args.command == "list" and not 'list' in args:
-    parser.print_help()
+if not args.command == "list" or not 'list' in args:
+    if args == None:
+        parser.print_help()
 else: 
-    if not "name" in args or args.name == None:
-        listAll()
-    else:
+    if args.command == 'list' and "name" in args and args.name:
         for key, value in envs.items():
             if name == key:
                 print(key + ":")
@@ -250,3 +328,5 @@ else:
                 print("     src:")
                 for src in value['src']:
                     print("        '" + str(src) + "'")
+    else:
+        listAll()
