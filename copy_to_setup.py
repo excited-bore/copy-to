@@ -8,24 +8,13 @@ import argparse
 from pathlib import Path
 file=Path("/home/burp/.copy_to_confs.json")
 
-#try:
-#    os.rename('/etc/foo', '/etc/bar')
-#except IOError as e:
-#    print(e)
-#    if (e == errno.EPERM):
-#       sys.exit("You need root permissions to do this, laterz!")
-
 if not os.path.exists(file):
     with open(file, "w") as outfile:
         json.dump({}, outfile)
 
 def is_valid_dir(parser, arg):
     if os.path.isdir(arg):
-        print('1' + arg)
-        return arg
-    elif os.path.isdir(os.path.join(os.getcwd(), arg)):
-        print('2' + os.path.join(os.getcwd(), arg))
-        return os.path.join(os.getcwd(), arg)
+        return os.path.abspath(arg)
     elif os.path.isfile(arg):
         print('%s is a file. A folder is required' % arg)
         raise SystemExit              
@@ -34,6 +23,7 @@ def is_valid_dir(parser, arg):
         raise SystemExit
 
 def is_valid_file_or_dir(parser, arg):
+    arg=os.path.abspath(arg)
     if os.path.isdir(arg):
         return arg
     elif os.path.isfile(arg):
@@ -111,7 +101,6 @@ def listAll():
             print("          '" + str(src) + "'")
 
 if args.command == 'help':
-    print("Positional argument 'modify' to configure")
     print("Positional argument 'run' to run config by name")
     parser.print_help()
     raise SystemExit
@@ -135,8 +124,6 @@ if args.command == 'run':
             src = envs[i]['src']
             copy_to(dest, src)
 elif args.command == 'add':
-    print(dest)
-    print(src)
     if not 'name' in args:
         print("Give up an configuration to copy objects between")
         raise SystemExit
@@ -219,10 +206,12 @@ elif args.command == 'reset_destination':
     elif not name in envs:
         print("Look again. " + name + " isn't in there.")
         raise SystemExit
+    elif dest in envs[name]['src']:
+        print('Destination and source can"t be one and the same')
+        raise SystemExit
     else:
         with open(file, 'w') as outfile:
             envs[name]['dest'] = str(dest)
-            print(envs)
             json.dump(envs, outfile)
         print('Reset destination of '+ str(name) +' to', dest)
 
@@ -238,6 +227,9 @@ elif args.command == 'reset_source':
         raise SystemExit
     elif not name in envs:
         print("Look again. " + name + " isn't in there.")
+        raise SystemExit
+    elif envs[name]['dest'] in src:
+        print('Destination and source can"t be one and the same')
         raise SystemExit
     else:
         with open(file, 'w') as outfile:
@@ -255,6 +247,6 @@ else:
             if name == key:
                 print(key + ":")
                 print("     dest:     '" + str(value['dest']) + "'")
-                print("         src:\n")
+                print("     src:")
                 for src in value['src']:
                     print("        '" + str(src) + "'")
