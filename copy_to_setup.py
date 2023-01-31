@@ -316,7 +316,7 @@ elif args.command == 'reset_source':
             json.dump(envs, outfile)
         print('Reset source of '+ str(name) + ' to', src)
 
-if not args.command == "list" or not 'list' in args:
+if not args.command == "list" and not 'list' in args:
     if args == None:
         parser.print_help()
 else: 
@@ -328,5 +328,5 @@ else:
                 print("     src:")
                 for src in value['src']:
                     print("        '" + str(src) + "'")
-    else:
+    elif 'list' in args and args.list:
         listAll()
