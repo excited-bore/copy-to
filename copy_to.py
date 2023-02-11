@@ -132,7 +132,7 @@ def get_main_parser():
     add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
     delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name", choices=get_group_names())
-    add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_group_names())
+    add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
     reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
