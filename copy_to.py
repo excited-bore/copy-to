@@ -5,9 +5,12 @@ import shutil
 import json
 import sys
 import errno
-import argcomplete
 import argparse
-from pathlib import Path
+import argcomplete
+from pathlib import Path 
+import IPython
+
+#file=os.path.expanduser("~/.copy_to_confs.json")
 file=os.path.expanduser("~/.copy_to_confs.json")
 if not os.path.exists(file):
     with open(file, "w") as outfile:
@@ -70,11 +73,16 @@ def EnvironCompleter(**kwargs):
 with open(file, 'r') as outfile:
     envs = json.load(outfile)
 
+def exist_name(parser, x):
+    not_exists=True
+    if x in envs or x == 'group' or x in envs['group']:
+        print("The name %s already exists as conf name!" % x)
+        listAll()
+        raise SystemExit 
+    return x
+
 def get_names():
     names=[]
-    envs = {}
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
     for key, name in envs.items():
         if not key == "group":
             names.append(key)
@@ -85,27 +93,23 @@ def get_names():
 
 def get_reg_names():
     names=[]
-    envs = {}
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
     for key, name in envs.items():
         if not key == "group":
             names.append(key)
     return names
 
 def get_group_names():
-    names=[] 
-    envs = {}
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
+    names=[]
     for e in envs['group']:
         names.append(e)
     return names
 
 def get_main_parser():
+    choices = argcomplete.completers.ChoicesCompleter
+
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparser = parser.add_subparsers(dest='command')
-    list = subparser.add_parser('list')
+    list1 = subparser.add_parser('list')
     run = subparser.add_parser('run')
     add = subparser.add_parser('add')
     delete = subparser.add_parser('delete')
@@ -114,28 +118,28 @@ def get_main_parser():
     delete_group = subparser.add_parser('delete_group')
     reset_destination = subparser.add_parser('reset_destination')
     reset_source = subparser.add_parser('reset_source')
-    help = subparser.add_parser('help')
-
-    run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name" )
+    help1 = subparser.add_parser('help')
+    list1.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names())
+    run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names())
     delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
+    delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names()).completer=choices(get_reg_names())
     add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    add.add_argument("name" , type=str ,help="Configuration name", metavar="Configuration Name")
+    add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration Name")
     add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), help="Destination folder")
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
-    add_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name")
+    add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group Name")
     add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name")
+    add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
     delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name")
-    add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+    delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name", choices=get_group_names())
+    add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_group_names())
     add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
     reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+    reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), help="Destination folder")
     reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name")
+    reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), help="Source files and directories")
     argcomplete.autocomplete(parser)
     return parser
@@ -196,7 +200,7 @@ if __name__ == "__main__":
                 copy_to(dest, src)
     elif args.command == 'add':
         if not 'name' in args:
-            print("Give up an configuration to copy objects between")
+            print("Give up a configuration name to copy objects between")
             raise SystemExit
         elif args.name == 'group':
             print("Name 'group' is reserved to keep track of groupnames")
@@ -364,5 +368,7 @@ if __name__ == "__main__":
                     print("     src:")
                     for src in value['src']:
                         print("        '" + str(src) + "'")
-        elif hasattr(args, 'list'):
+        elif not args.command == None and args.command == 'list' or list in args:
             listAll()
+        else:
+            pass
