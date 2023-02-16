@@ -29,6 +29,6 @@ Delete groupname
 `copy-to delete_group mygroupname`
 
 
-Configuration files at `~/.configs/copy-to/confs.json` for Linux 
+Configuration files at `~/.config/copy-to/confs.json` for Linux 
 
 Windows and mac not tested
