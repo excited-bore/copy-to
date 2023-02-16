@@ -11,10 +11,24 @@ from pathlib import Path
 import IPython
 
 #file=os.path.expanduser("~/.copy_to_confs.json")
-file=os.path.expanduser("~/.copy_to_confs.json")
+file=os.path.expanduser("~/.config/copy_to/confs.json")
+folder=os.path.expanduser("~/.config/copy_to/")
+
+if not os.path.exists(folder):
+    os.makedirs(folder)
+
 if not os.path.exists(file):
     with open(file, "w") as outfile:
         json.dump({}, outfile)
+
+with open(file, 'r') as outfile:
+    envs = json.load(outfile)
+
+if not 'group' in envs:
+    with open(file, 'w') as outfile: 
+        envs['group'] = []
+        json.dump(envs, outfile)
+
 
 def is_valid_dir(parser, arg):
     if os.path.isdir(arg):
@@ -70,8 +84,6 @@ def EnvironCompleter(**kwargs):
     return os.environ
  
    
-with open(file, 'r') as outfile:
-    envs = json.load(outfile)
 
 def exist_name(parser, x):
     not_exists=True
@@ -155,10 +167,6 @@ if __name__ == "__main__":
         name = filterListDoubles(name)
     src = filterListDoubles(src)
                     
-    if not 'group' in envs:
-        with open(file, 'w') as outfile: 
-            envs['group'] = []
-            json.dump(envs, outfile)
     
     if args.command == 'help':
         print("Positional argument 'run' to run config by name")
