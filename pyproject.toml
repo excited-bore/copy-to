@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling", "argcomplete"]
+build-backend = "hatchling.build"
+[project]
+name = "copy-to"
+version = "1.0.0"
+authors = [
+  { name="Stan Nys", email="stan96@duck.com" },
+]
+description = "A little commandline tool to copy and paste multiple files and directories to single directory with use of configuration"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/excited-bore/copy-to"
+"Bug Tracker" = "https://github.com/excited-bore/copy-to/issues"
+
