@@ -5,7 +5,7 @@ A little python script i use in conjunction with git so you can easily copy conf
 Depends on [argcomplete](https://pypi.org/project/argcomplete/)
 
 Install it with:
-`pip3 install argcomplete`
+`pip3 install argcomplete copy-to`
 
 List configured paths and files with `copy-to list myname` 
 or just `copy-to list`
