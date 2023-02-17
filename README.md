@@ -1,7 +1,11 @@
 # copy-to
 
 A little python script i use in conjunction with git so you can easily copy config files from anywhere in an instant to do whatever with!
-alias this with `alias copy-to='python /path/to/copy-to_setup.py'`
+
+Depends on [argcomplete](https://pypi.org/project/argcomplete/)
+
+Install it with:
+`pip3 install argcomplete`
 
 List configured paths and files with `copy-to list myname` 
 or just `copy-to list`
@@ -29,7 +33,9 @@ Delete groupname
 `copy-to delete_group mygroupname`
 
 Configuration files at `~/.config/copy-to/confs.json` for Linux 
+
 Don't forget to add to path in `~/.bashrc` with:
+
 `export PATH=$PATH:$(python -m site --user-site)/copy-to/copy-to`
 if installed in default python package site
 
