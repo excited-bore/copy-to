@@ -6,6 +6,12 @@ Depends on [argcomplete](https://pypi.org/project/argcomplete/)
 
 Install it with:
 `pip3 install argcomplete copy-to`
+and run `activate-global-python-argcomplete`
+
+Then add it to path in `~/.bashrc`
+
+For example, using default python package site
+`export PATH=$PATH:$(python -m site --user-site)/copy-to/copy-to`
 
 List configured paths and files with `copy-to list myname` 
 or just `copy-to list`
@@ -33,10 +39,5 @@ Delete groupname
 `copy-to delete_group mygroupname`
 
 Configuration files at `~/.config/copy-to/confs.json` for Linux 
-
-Don't forget to add to path in `~/.bashrc` with:
-
-`export PATH=$PATH:$(python -m site --user-site)/copy-to/copy-to`
-if installed in default python package site
 
 Windows and mac not tested
