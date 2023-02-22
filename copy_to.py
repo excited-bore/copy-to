@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
+
 import os
 import shutil
 import json
@@ -8,11 +9,10 @@ import errno
 import argparse
 import argcomplete
 from pathlib import Path 
-import IPython
 import subprocess
 
 
-#file=os.path.expanduser("~/.copy_to_confs.json")
+os.popen("eval $(register-python-argcomplete copy-to)").read()
 file=os.path.expanduser("~/.config/copy_to/confs.json")
 complete=os.path.expanduser("~/.config/copy_to/")
 folder=os.path.expanduser("~/.config/copy_to/")
@@ -24,14 +24,13 @@ if not os.path.exists(file):
     with open(file, "w") as outfile:
         json.dump({}, outfile)
 
-with open(file, 'r') as outfile:
-    envs = json.load(outfile)
+with open(file, 'r') as infile:
+    envs = json.load(infile)
 
 with open(file, 'w') as outfile: 
     if not 'group' in envs:
         envs['group'] = [] 
     json.dump(envs, outfile)
-
 
 def is_valid_dir(parser, arg):
     if os.path.isdir(arg):
@@ -90,7 +89,7 @@ def PathCompleter(**kwargs):
 def PathOnlyDirsCompleter(**kwargs):
     return [ name for name in os.listdir(str(os.getcwd())) if os.path.isdir(os.path.join(os.getcwd()), name) ]
 
-def SourceComplete():
+def SourceComplete():    
     return range(1,4)
 
 def exist_name(parser, x):
@@ -175,7 +174,33 @@ def get_main_parser():
     argcomplete.autocomplete(parser)
     return parser
 
-if __name__ == "__main__":
+def main():
+    os.popen("eval $(register-python-argcomplete copy-to)").read()
+    """from os.path import dirname, abspath
+    d = dirname(abspath(__file__))
+
+    sys.path.append(d)"""
+    #file=os.path.expanduser("~/.copy_to_confs.json")
+    
+    file=os.path.expanduser("~/.config/copy_to/confs.json")
+    complete=os.path.expanduser("~/.config/copy_to/")
+    folder=os.path.expanduser("~/.config/copy_to/")
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)                         
+
+    if not os.path.exists(file):
+        with open(file, "w") as outfile:
+            json.dump({}, outfile)
+
+    with open(file, 'r') as outfile:
+        envs = json.load(outfile)
+
+    with open(file, 'w') as outfile: 
+        if not 'group' in envs:
+            envs['group'] = [] 
+        json.dump(envs, outfile)
+
     parser = get_main_parser()
     args = parser.parse_args()
 
@@ -236,8 +261,8 @@ if __name__ == "__main__":
         if not 'name' in args:
             print("Give up a configuration name to copy objects between")
             raise SystemExit
-        elif args.name == 'group':
-            print("Name 'group' is reserved to keep track of groupnames")
+        elif args.name == 'group' or args.name == 'all':
+            print("Name 'group' and 'all' are reserved in namespace")
             raise SystemExit
         elif name in envs:
             print("Look again. " + str(name) + " is/are already used as name.")
@@ -264,8 +289,8 @@ if __name__ == "__main__":
         if not 'groupname' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
-        elif args.groupname == 'group':
-            print("Name 'group' is reserved to keep track of groupnames")
+        elif args.groupname == 'group' or args.groupname == 'all' :
+            print("Name 'group' and 'all' are reserved in namespace")
             raise SystemExit
         elif args.groupname in envs:
             print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
@@ -434,7 +459,7 @@ if __name__ == "__main__":
         parser.print_help()
     else: 
         if args.command == 'list' and "name" in args and args.name:
-            if args.name == ['all']:
+            if args.name == 'all':
                 listAll()
             else:
                 for key, value in envs.items():
@@ -449,3 +474,7 @@ if __name__ == "__main__":
         else:
             pass
 
+if __name__ == "__main__":
+#!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
+    main()

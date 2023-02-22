@@ -1,0 +1,9 @@
+LICENSE
+README.md
+copy_to.py
+pyproject.toml
+copy_to.egg-info/PKG-INFO
+copy_to.egg-info/SOURCES.txt
+copy_to.egg-info/dependency_links.txt
+copy_to.egg-info/entry_points.txt
+copy_to.egg-info/top_level.txt

@@ -1,0 +1,2 @@
+[console_scripts]
+copy-to = copy_to:main
