@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#i!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 
 import os
@@ -55,7 +55,6 @@ def is_valid_file_or_dir(parser, arg):
         raise SystemExit
 
 def copy_to(dest, src):
-
     for element in src:
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
         if os.path.isfile(element):
@@ -65,6 +64,17 @@ def copy_to(dest, src):
         elif os.path.isdir(element):
             shutil.copytree(element, exist_dest, dirs_exist_ok=True)
             print("Copied to " + str(exist_dest) + " and all it's inner content")
+
+def copy_from(dest, src):
+    for element in src:
+        exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if os.path.isfile(exist_dest):
+            shutil.copy2(exist_dest, element)
+            print("Copied to " + str(element))
+
+        elif os.path.isdir(exist_dest):
+            shutil.copytree(exist_dest, element, dirs_exist_ok=True)
+            print("Copied to " + str(element) + " and all it's inner content")
 
 
 def listAll():
@@ -137,6 +147,7 @@ def get_main_parser():
     subparser = parser.add_subparsers(dest='command')
     list1 = subparser.add_parser('list')
     run = subparser.add_parser('run')
+    run_reverse = subparser.add_parser('run-reverse')
     add = subparser.add_parser('add')
     delete = subparser.add_parser('delete')
     add_source = subparser.add_parser('add-source')
@@ -148,6 +159,7 @@ def get_main_parser():
     help1 = subparser.add_parser('help')
     list1.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
     run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
+    run_reverse.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
     delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
     add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
@@ -257,6 +269,48 @@ def main():
                 dest = envs[i]['dest']
                 src = envs[i]['src']
                 copy_to(dest, src)
+
+    if args.command == 'run-reverse':
+        if envs == {}:
+            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
+            raise SystemExit
+        elif not 'name' in args:
+            print("Give up an configuration to copy objects between")
+            raise SystemExit
+        elif args.name == ['all']:
+            for i in envs:
+                if not i == 'group':
+                    print('\n' + i.upper() + ':')
+                    dest = envs[i]['dest']
+                    src = envs[i]['src']
+                    copy_from(dest, src)   
+        else:
+            var = []
+            grps = []
+            for key in name:
+                if key in envs['group']:
+                    var.append(envs['group'][key])
+                    grps.append(key)
+            var1=[]
+            for i in var:
+                for e in i:
+                    var1.append(e)
+            for key in name:
+                if not key in grps:
+                    var1.append(key)
+            var1 = filterListDoubles(var1)
+            for key in var1:
+                if not key in envs:
+                    print("Look again. " + key + " isn't in there.")
+                    listAll()
+                    raise SystemExit
+            for i in var1:
+                i=str(i)
+                print('\n' + i.upper() + ':')
+                dest = envs[i]['dest']
+                src = envs[i]['src']
+                copy_from(dest, src)
+                
     elif args.command == 'add':
         if not 'name' in args:
             print("Give up a configuration name to copy objects between")

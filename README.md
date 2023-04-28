@@ -16,7 +16,7 @@ activate-global-python-argcomplete
 ```
 for installing pythoncompletions globally.
 
-Add a pairset of dest_folder/source_files_and_directories with 
+Add a pairset of destination folder - source files and/or directories with 
 ```
 copy-to add myname destination_folder sourcefile1 (sourcefolder1 sourcefile2 sourcefile3 sourcefolder2/*) ...
 ```
@@ -32,9 +32,14 @@ copy-to list
 You can also use 'all' to list/run all regular names 
 
 
-Copy the files by running 
+Copy the files to their destination by running 
 ```
 copy-to run myname1 (myname2)
+```
+
+Or copy the files back to source by running 
+```
+copy-to run-reverse myname1 (myname2)
 ```
 
 Delete set of dest/src by name with 
