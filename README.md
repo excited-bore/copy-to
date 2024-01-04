@@ -7,12 +7,12 @@ Depends on [argcomplete](https://pypi.org/project/argcomplete/)
 Install it with:
 
 ```
-pip3 install argcomplete copy-to
+pipx install copy-to
 ```
 Try running it once if autocompletions aren't working
 
 ``` 
-activate-global-python-argcomplete
+sudo activate-global-python-argcomplete
 ```
 for installing pythoncompletions globally.
 

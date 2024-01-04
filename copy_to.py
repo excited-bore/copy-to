@@ -187,8 +187,9 @@ def get_main_parser():
     return parser
 
 def main():
+    """
     os.popen("eval $(register-python-argcomplete copy-to)").read()
-    """from os.path import dirname, abspath
+    from os.path import dirname, abspath
     d = dirname(abspath(__file__))
 
     sys.path.append(d)"""
