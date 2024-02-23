@@ -43,18 +43,51 @@ def is_valid_dir(parser, arg):
         raise SystemExit
 
 def is_names_or_group(parser, arg):
-    if arg == 'names':
+    if arg == 'all':
+        listAll()
+        return arg
+    elif arg in get_names(False):
+        for key, value in envs.items():
+            if arg == key:
+                print(key + ":")
+                print("     Destination: '" + str(value['dest']) + "'")
+                print("     Source: ")
+                for idx, src in enumerate(value['src']):
+                    print("          " + str(idx+1) + ") '" + str(src) + "'")        
+            elif 'group' == key and arg in value:
+                print(arg + ":")
+                for key1 in envs['group'][arg]:
+                    for name, value in envs.items():
+                            if key1 == name:
+                                print("     " + name + ":")
+                                print("         Destination: '" + str(value['dest']) + "'")
+                                print("         Source: ")
+                                for idx, src in enumerate(value['src']):
+                                    print("             " + str(idx+1) + ") '" + str(src) + "'")
+                    
+        return arg
+    elif arg == 'names':
         for name, value in envs.items():
             if not name == 'group' and not name in envs['group']:
                 print(name)
         return arg
     elif arg == 'groups':
         for name, value in envs.items():
-            if not name == 'group' and name in envs['group']:
-                print(name)
+            if name == 'group':
+                for group in envs['group']:
+                    print(group + ":")
+                    for key in envs['group'][group]:
+                         for name, value in envs.items():
+                            if key == name:
+                                print("     " + name + ":")
+                                print("         Destination: '" + str(value['dest']) + "'")
+                                print("         Source: ")
+                                for idx, src in enumerate(value['src']):
+                                    print("             " + str(idx+1) + ") '" + str(src) + "'")
+                        
         return arg
     else:
-        print("Give up 'names' or 'groups' as argument")
+        print("Give up 'all', 'names', 'groups', a configured name or group as an argument")
         raise SystemExit
 
 def is_valid_file_or_dir(parser, arg):
@@ -94,7 +127,12 @@ def copy_from(dest, src):
 
 def listAll():
     for name, value in envs.items():
-        if not name == 'group':
+        if name == 'group':
+            for group in envs['group']:
+                print(group + " (group):")
+                for key in envs['group'][group]:
+                    print("     " + key)
+        elif not name == 'group':
             print(name + ":")
             print("     Destination: '" + str(value['dest']) + "'")
             print("     Source :")
@@ -139,6 +177,22 @@ def get_names(special=False):
             names.append("all")
         return names
 
+def get_list_names(special=False):
+    names=[]
+    with open(file, 'r') as outfile:
+        envs = json.load(outfile)
+        for key, name in envs.items():
+            if not key == "group":
+                names.append(key)
+            else:
+                for e in envs['group']:
+                    names.append(e)
+        if special:
+            names.append("all")
+            names.append("names")
+            names.append("groups")
+        return names 
+
 def get_reg_names():
     with open(file, 'r') as outfile:
         envs = json.load(outfile)
@@ -172,30 +226,30 @@ def get_main_parser():
     delete_source = subparser.add_parser('delete-source')
     reset_source = subparser.add_parser('reset-source')
     help1 = subparser.add_parser('help')
-    list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=['names', 'groups'])
+    list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=get_list_names(True))
     run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
     run_reverse.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
-    delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
-    add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add.add_argument("name" , type=lambda x: Exist_name(parser, x) ,help="Configuration name", metavar="Configuration Name, ")
     add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory")
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group Name")
-    add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
-    delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group Name", choices=get_group_names())
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
-    add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
-    reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory", help="Destination directory")
-    delete_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #delete_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     delete_source.add_argument("src_num" , nargs='*', type=int, metavar="Source files and directories or Index numbers", help="Source files and directories or Index numbers")
-    reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    #reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration Name",  choices=get_reg_names())
     reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     argcomplete.autocomplete(parser)
@@ -369,14 +423,17 @@ def main():
             print("Change " + str(args.groupname) + ". It's already taken")
             raise SystemExit
         else:
+            groups = []
             for key in name:
                 if not key in envs:
                     print("Look again. " + key + " isn't in there.")
                     listAll()
                     raise SystemExit
             with open(file, 'w') as outfile: 
-                envs['group'] = { args.groupname : name }
-                print(str(args.groupname) + ' added to sets of src/dest')
+                for key in name:
+                    groups.append(key)
+                envs['group'] = { args.groupname : groups }
+                print(str(args.groupname) + ' added to group settings')
                 json.dump(envs, outfile)
     
     elif args.command == 'delete':
@@ -526,23 +583,8 @@ def main():
             print('Reset source of '+ str(name) + ' to', src)
 
     if args.command == None :
-        parser.print_help()
-    else: 
-        if args.command == 'list' and "name" in args and args.name:
-            if args.name == 'all':
-                listAll()
-            else:
-                for key, value in envs.items():
-                    if name == key:
-                        print(key + ":")
-                        print("     Destination: '" + str(value['dest']) + "'")
-                        print("     Source: ")
-                        for idx, src in enumerate(value['src']):
-                            print("          " + str(idx+1) + ") '" + str(src) + "'")
-        elif not args.command == None and args.command == 'list' and not args.name == 'names' and not args.name == 'groups' or list in args:
-            listAll()
-        else:
-            pass
+        parser.print_help() 
+
 
 if __name__ == "__main__":
 #!/usr/bin/env python

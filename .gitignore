@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-copy-to.egg-info/
+copy_to.egg-info/
 __pycache__/
 dist/
 wheels/
