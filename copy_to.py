@@ -540,7 +540,6 @@ def main():
                         for idx, src in enumerate(value['src']):
                             print("          " + str(idx+1) + ") '" + str(src) + "'")
         elif not args.command == None and args.command == 'list' and not args.name == 'names' and not args.name == 'groups' or list in args:
-            print(args)
             listAll()
         else:
             pass
