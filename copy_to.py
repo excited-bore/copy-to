@@ -42,6 +42,21 @@ def is_valid_dir(parser, arg):
         print("The directory %s does not exist!" % arg)
         raise SystemExit
 
+def is_names_or_group(parser, arg):
+    if arg == 'names':
+        for name, value in envs.items():
+            if not name == 'group' and not name in envs['group']:
+                print(name)
+        return arg
+    elif arg == 'groups':
+        for name, value in envs.items():
+            if not name == 'group' and name in envs['group']:
+                print(name)
+        return arg
+    else:
+        print("Give up 'names' or 'groups' as argument")
+        raise SystemExit
+
 def is_valid_file_or_dir(parser, arg):
     arg=os.path.abspath(arg)
     if os.path.isdir(arg):
@@ -80,9 +95,9 @@ def copy_from(dest, src):
 def listAll():
     for name, value in envs.items():
         if not name == 'group':
-            print(name.upper() + ":")
-            print("     Dest:   '" + str(value['dest']) + "'")
-            print("     Src :")
+            print(name + ":")
+            print("     Destination: '" + str(value['dest']) + "'")
+            print("     Source :")
             for idx, src in enumerate(value['src']):
                 print("          " + str(idx+1) + ") '" + str(src) + "'")
 
@@ -157,13 +172,13 @@ def get_main_parser():
     delete_source = subparser.add_parser('delete-source')
     reset_source = subparser.add_parser('reset-source')
     help1 = subparser.add_parser('help')
-    list1.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
+    list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=['names', 'groups'])
     run.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
     run_reverse.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_names(True))
     delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration Name", choices=get_reg_names())
     add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration Name, ")
+    add.add_argument("name" , type=lambda x: Exist_name(parser, x) ,help="Configuration name", metavar="Configuration Name, ")
     add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory")
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group Name")
@@ -240,7 +255,7 @@ def main():
         elif args.name == ['all']:
             for i in envs:
                 if not i == 'group':
-                    print('\n' + i.upper() + ':')
+                    print('\n' + i + ':')
                     dest = envs[i]['dest']
                     src = envs[i]['src']
                     copy_to(dest, src)   
@@ -266,7 +281,7 @@ def main():
                     raise SystemExit
             for i in var1:
                 i=str(i)
-                print('\n' + i.upper() + ':')
+                print('\n' + i + ':')
                 dest = envs[i]['dest']
                 src = envs[i]['src']
                 copy_to(dest, src)
@@ -281,7 +296,7 @@ def main():
         elif args.name == ['all']:
             for i in envs:
                 if not i == 'group':
-                    print('\n' + i.upper() + ':')
+                    print('\n' + i + ':')
                     dest = envs[i]['dest']
                     src = envs[i]['src']
                     copy_from(dest, src)   
@@ -307,7 +322,7 @@ def main():
                     raise SystemExit
             for i in var1:
                 i=str(i)
-                print('\n' + i.upper() + ':')
+                print('\n' + i + ':')
                 dest = envs[i]['dest']
                 src = envs[i]['src']
                 copy_from(dest, src)
@@ -482,8 +497,8 @@ def main():
                 envs[name].update({ "src" : [*src] })
                 json.dump(envs, outfile)
             
-            print("     dest:     '" + str(envs[name]['dest']) + "'")
-            print("     src:")
+            print("     Destination:     '" + str(envs[name]['dest']) + "'")
+            print("     Source:")
             for idx, src in enumerate(envs[name]['src']):
                 print("          " + str(idx+1) + ") '" + str(src) + "'")
     
@@ -519,12 +534,13 @@ def main():
             else:
                 for key, value in envs.items():
                     if name == key:
-                        print(key.upper() + ":")
-                        print("     Dest:   '" + str(value['dest']) + "'")
-                        print("     Src: ")
+                        print(key + ":")
+                        print("     Destination: '" + str(value['dest']) + "'")
+                        print("     Source: ")
                         for idx, src in enumerate(value['src']):
                             print("          " + str(idx+1) + ") '" + str(src) + "'")
-        elif not args.command == None and args.command == 'list' or list in args:
+        elif not args.command == None and args.command == 'list' and not args.name == 'names' and not args.name == 'groups' or list in args:
+            print(args)
             listAll()
         else:
             pass
