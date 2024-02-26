@@ -1,6 +1,5 @@
 #i!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
-
 import os
 import shutil
 import json
@@ -24,8 +23,12 @@ class Conf:
             self.file=os.path.expanduser(os.path.realpath(os.getenv('COPY_TO')))
             self.folder=os.path.dirname(self.file)
         else:
-            self.file=os.path.expanduser("~/.ig/copy-to/confs.json")
+            self.file=os.path.expanduser("~/.config/copy-to/confs.json")
             self.folder=os.path.dirname(self.file)
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
         with open(self.file, 'r') as infile: 
             self.envs = json.load(infile)
             if not 'group' in self.envs:
@@ -35,9 +38,6 @@ class Conf:
 
 conf = Conf()
 
-if not os.path.exists(conf.folder):
-    os.makedirs(conf.folder)
-                           
 def is_git_repo(path):
     try:
         repo = git.Repo(path).git_dir
@@ -897,7 +897,7 @@ def main():
                 listName(name)
             print('Reset source of '+ str(name) + ' to', str(src))
 
-    if args.command == None :
+    if args.command == None:
         parser.print_help()
 
 
