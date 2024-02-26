@@ -10,6 +10,7 @@ import argcomplete
 import git
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.application.current import get_app
 from git import Repo
 from pathlib import Path 
@@ -27,14 +28,16 @@ class Conf:
             self.folder=os.path.dirname(self.file)
         if not os.path.exists(self.folder):
             os.makedirs(self.folder)
-        if not os.path.exists(self.folder):
-            os.makedirs(self.folder)
+        self.readfile()
+
+    def readfile(self):
         with open(self.file, 'r') as infile: 
             self.envs = json.load(infile)
             if not 'group' in self.envs:
                 self.envs['group'] = [] 
         with open(self.file, 'w') as outfile: 
             json.dump(self.envs, outfile)
+
 
 conf = Conf()
 
@@ -44,6 +47,18 @@ def is_git_repo(path):
         return True
     except git.exc.InvalidGitRepositoryError:
         return False
+
+if is_git_repo("./"):
+    try:
+        repo = git.Repo("./")
+        res = repo.config_reader().get_value("copy-to", "file")
+        if res:
+            conf.file = os.path.abspath(res)
+            conf.folder = os.path.dirname(res)
+            conf.readfile()
+    except:
+        pass
+
 def is_valid_dir(parser, arg):
     if os.path.isdir(arg):
         return os.path.abspath(arg)
@@ -103,8 +118,8 @@ def is_valid_group(parser, arg):
         raise SystemExit
 
 def is_valid_conf(parser, arg):
+    file = os.path.realpath(os.path.expanduser(arg)) 
     if arg.endswith('.json') and os.path.exists(os.path.expanduser(arg)):
-        file = os.path.expanduser(os.path.realpath(arg)) 
         try:
             with open(file) as fp:
                 conf.envs = json.load(fp)
@@ -113,18 +128,20 @@ def is_valid_conf(parser, arg):
                     raise SystemExit
             conf.file = file
             conf.folder = os.path.dirname(file)
+            conf.readfile()
             return file
         except:
             print("Couldn't open the file. Was the file a readable '.json'?")
             raise SystemExit
     elif arg.endswith('.json') and not os.path.exists(os.path.expanduser(arg)):
         try:
-            with open(os.path.expanduser(arg), "w") as outfile:
+            with open(file, "w") as outfile:
                 conf.envs = {}
                 conf.envs['group'] = [] 
                 json.dump(conf.envs, outfile)
             conf.file = file
             conf.folder = os.path.dirname(file)
+            conf.readfile()
             return file
         except:
             print("Couldn't create a new configurationfile. Did the path exist and was the filetype '.json'?")
@@ -276,8 +293,8 @@ def filterListDoubles(a):
     ret = [x for x in a if x not in seen and not seen.add(x)]
     return ret
 
-def PathCompleter(**kwargs):
-    return os.path
+#def PathCompleter(**kwargs):
+#    return os.path
 
 def PathOnlyDirsCompleter(**kwargs):
     return [ name for name in os.listdir(str(os.getcwd())) if os.path.isdir(os.path.join(os.getcwd()), name) ]
@@ -453,10 +470,15 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
     else:
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "run", 'none')
+    res = conf.file
+    res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): ", pre_run=prompt_autocomplete, completer=PathCompleter())
+    if not res:
+        res = conf.file
+    elif not res.endswith('.json'):
+        print("The file " + str(res) + " is not a .json file")
         raise SystemExit
-
     with repo.config_writer() as confw:
-        confw.set_value("copy-to", "run", res)
+        confw.set_value("copy-to", "file", res)
     print("Added " + str(res) + " to local git configuration")
     return res
 
@@ -464,6 +486,7 @@ def get_main_parser():
     choices = argcomplete.completers.ChoicesCompleter
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    parser.add_argument("-f","--file", type=lambda x: is_valid_conf(parser, x), required=False, help="Configuration file", metavar="Configuration file")
     subparser = parser.add_subparsers(dest='command')
     list1 = subparser.add_parser('list')
     run = subparser.add_parser('run')
@@ -481,69 +504,45 @@ def get_main_parser():
     reset_source = subparser.add_parser('reset-source')
     help1 = subparser.add_parser('help')
     list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=get_list_names(True))
-    list1.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
     
     run.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    run.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
     run_reverse.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    run_reverse.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
     
-    add.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
     add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration name")
     add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory")
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     
-    
-    #delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
-    delete.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
     
-
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name")
-    add_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
-    #add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
-    #delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    delete_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
     
     add_to_group.add_argument("groupname", type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    add_to_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
     add_to_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
-
     delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    delete_from_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
     delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
-
     
-    set_git.add_argument("name" , nargs='?' ,type=str ,help="Configuration (group)name", metavar="Configuration (group)name", choices=get_names(True))
-    set_git.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    git_command = set_git.add_subparsers(dest='gitcommand')
+    git_run = git_command.add_parser('run')
+    git_run.add_argument("value" , nargs='?' ,type=str , help="Configuration name", metavar="Configuration name", choices=get_names(True))
+    git_file = git_command.add_parser('file')
+    git_file.add_argument("value" , nargs='?' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
     
-
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
-    add_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
-    #add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
-    #reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+
     reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
     reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory", help="Destination directory")
-    #delete_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+
     delete_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
-    delete_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
     delete_source.add_argument("src_num" , nargs='*', type=int, metavar="Source files and directories or Index numbers", help="Source files and directories or Index numbers")
-    #reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+
     reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
-    reset_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
-    
     reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
+    
     argcomplete.autocomplete(parser)
     return parser
 
@@ -614,19 +613,39 @@ def main():
             if args.list:
                 listName(name)
     elif args.command == 'set-git':
-        if not args.name:
-            ask_git()
-        else:
+        if not args.gitcommand:
+            args.gitcommand = prompt("Give up a git value to set (run/file): ", pre_run=prompt_autocomplete, completer=WordCompleter(["run", "file"]))
+            
+        if args.gitcommand == 'run':
            repo = git.Repo("./")
+           res = "all"
            names = []
-           for name, value in conf.envs.items():
-                if not name == 'group':
-                    names.append(str(name))
-           res = prompt(prompt, pre_run=prompt_autocomplete, completer=WordCompleter(names))
+           if not hasattr(args, 'value') or not args.value:
+               for name, value in conf.envs.items():
+                    if not name == 'group':
+                        names.append(str(name))
+               res = prompt("Names: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
+               if res == '':
+                   res = "all" 
+           else:
+               res = args.value
            with repo.config_writer() as confw:
                confw.set_value("copy-to", "run", res)
            if args.list:
                 listName(res)
+           print("Added " + str(res) + " to local git configuration")
+        elif args.gitcommand == 'file':
+           repo = git.Repo("./")
+           res = conf.file
+           if hasattr(args, 'value') and args.value:
+               res = args.value
+           else: 
+               res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): " , pre_run=prompt_autocomplete, completer=PathCompleter())
+           if not res.endswith('.json'):
+               print("The file " + str(res) + " must be a '.json' file")
+               raise SystemExit
+           with repo.config_writer() as confw:
+               confw.set_value("copy-to", "file", res)
            print("Added " + str(res) + " to local git configuration")
         
 
@@ -897,7 +916,9 @@ def main():
                 listName(name)
             print('Reset source of '+ str(name) + ' to', str(src))
 
-    if args.command == None:
+    elif args.command == None and args.list:
+        listAll()
+    else:
         parser.print_help()
 
 

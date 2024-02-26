@@ -42,13 +42,14 @@ Or copy the files back to source by running
 copy-to run-reverse myname1 (myname2)
 ```  
 
-Run and run-reverse can run without arguments when present in a git repository that has configured copy-to (Excluding global gitconfig). This is so it can be hooked to a git macro more easily, f.ex. on startup of [Lazygit](https://github.com/jesseduffield/lazygit).  
+Run and run-reverse can run without arguments when present in a git repository that has configured copy-to (Excluding global gitconfig). This is so it can be hooked to a git macro more easily, f.ex. with an alias (alias git-status="git status && copy-to run") or on startup of [Lazygit](https://github.com/jesseduffield/lazygit).  
 ```
 [copy-to]
     run = myname1 myname2
+    file = myconf.json
 ```  
 This can be setup with `copy-to add myname` and `copy-to set-git myname` or  
-`copy-to add myname` and `copy-to run`/`copy-to run-reverse` after wich a prompt will ask if you want to set it up with git. Both `copy-to run` and `copy-to run-reverse` will run using the same `run` arguments  
+`copy-to add myname` and `copy-to run`/`copy-to run-reverse` after wich a prompt will ask if you want to set it up with git. Both `copy-to run` and `copy-to run-reverse` will run using the same `run` arguments. A custom conf.json can be also be setup and will always take precedence over other file options when set up.  
 
 
 List configured paths and files with  
