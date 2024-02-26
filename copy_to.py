@@ -16,33 +16,34 @@ from git import Repo
 from pathlib import Path 
 import subprocess
 
+os.popen("eval $(register-python-argcomplete copy-to)").read()
+
+class Conf:
+    def __init__(self):
+        if os.getenv('COPY_TO'):
+            self.file=os.path.expanduser(os.path.realpath(os.getenv('COPY_TO')))
+            self.folder=os.path.dirname(self.file)
+        else:
+            self.file=os.path.expanduser("~/.ig/copy-to/confs.json")
+            self.folder=os.path.dirname(self.file)
+        with open(self.file, 'r') as infile: 
+            self.envs = json.load(infile)
+            if not 'group' in self.envs:
+                self.envs['group'] = [] 
+        with open(self.file, 'w') as outfile: 
+            json.dump(self.envs, outfile)
+
+conf = Conf()
+
+if not os.path.exists(conf.folder):
+    os.makedirs(conf.folder)
+                           
 def is_git_repo(path):
     try:
         repo = git.Repo(path).git_dir
         return True
     except git.exc.InvalidGitRepositoryError:
         return False
-
-is_git_repo("./")
-os.popen("eval $(register-python-argcomplete copy-to)").read()
-file=os.path.expanduser("~/.config/copy-to/confs.json")
-folder=os.path.expanduser("~/.config/copy-to/")
-
-if not os.path.exists(folder):
-    os.makedirs(folder)
-
-if not os.path.exists(file):
-    with open(file, "w") as outfile:
-        json.dump({}, outfile)
-
-with open(file, 'r') as infile:
-    envs = json.load(infile)
-
-with open(file, 'w') as outfile: 
-    if not 'group' in envs:
-        envs['group'] = [] 
-    json.dump(envs, outfile)
-
 def is_valid_dir(parser, arg):
     if os.path.isdir(arg):
         return os.path.abspath(arg)
@@ -61,10 +62,13 @@ def is_names_or_group(parser, arg):
         listName(arg)
         return arg
     elif arg == 'names':
-        listNames()
+        listnames()
         return arg
     elif arg == 'all-no-group':
         listNoGroup()
+        return arg
+    elif arg == 'file':
+        listFile()
         return arg
     elif arg == 'groups':
         listGroups()                
@@ -79,7 +83,54 @@ def is_names_or_group(parser, arg):
         listAllNames()                
         return arg
     else:
-        print("Give up 'all', 'names', 'groups', a configured name or group as an argument")
+        print("Give up 'file'/'all'/'all-no-group'/'groups'/'all-groups'/'names'/'groupnames'/'all-names' or a configuration name/groupname as an argument")
+        raise SystemExit
+
+def is_valid_name(parser, arg):
+    if arg in get_reg_names():
+        return arg
+    else:
+        print("Give up a name. Look at this list for reference: ")
+        listNoGroup()
+        raise SystemExit 
+
+def is_valid_group(parser, arg):
+    if arg in get_group_names():
+        return arg
+    else:
+        print("Give up a groupname. Look at this list for reference: ")
+        listGroups()
+        raise SystemExit
+
+def is_valid_conf(parser, arg):
+    if arg.endswith('.json') and os.path.exists(os.path.expanduser(arg)):
+        file = os.path.expanduser(os.path.realpath(arg)) 
+        try:
+            with open(file) as fp:
+                conf.envs = json.load(fp)
+                if not 'group' in conf.envs:
+                    print("The file %s is not a valid configuration file!" % arg)
+                    raise SystemExit
+            conf.file = file
+            conf.folder = os.path.dirname(file)
+            return file
+        except:
+            print("Couldn't open the file. Was the file a readable '.json'?")
+            raise SystemExit
+    elif arg.endswith('.json') and not os.path.exists(os.path.expanduser(arg)):
+        try:
+            with open(os.path.expanduser(arg), "w") as outfile:
+                conf.envs = {}
+                conf.envs['group'] = [] 
+                json.dump(conf.envs, outfile)
+            conf.file = file
+            conf.folder = os.path.dirname(file)
+            return file
+        except:
+            print("Couldn't create a new configurationfile. Did the path exist and was the filetype '.json'?")
+            raise SystemExit
+    else:
+        print("The file %s does not exist/is not in .json format!" % arg)
         raise SystemExit
 
 def get_git_repo_name():
@@ -134,11 +185,11 @@ def copy_from(dest, src):
 
 
 def listAll():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if name == 'group':
-            for group in envs['group']:
+            for group in conf.envs['group']:
                 print(group + " (group):")
-                for key in envs['group'][group]:
+                for key in conf.envs['group'][group]:
                     print("     " + key)
         elif not name == 'group':
             print(name + ":")
@@ -148,7 +199,7 @@ def listAll():
                 print("          " + str(idx+1) + ") '" + str(src) + "'")
 
 def listName(arg):      
-    for key, value in envs.items():
+    for key, value in conf.envs.items():
         if arg == key:
             print(key + ":")
             print("     Destination: '" + str(value['dest']) + "'")
@@ -157,8 +208,8 @@ def listName(arg):
                 print("          " + str(idx+1) + ") '" + str(src) + "'")        
         elif 'group' == key and arg in value:
             print(arg + ":")
-            for key1 in envs[key][arg]:
-                for name, value in envs.items():
+            for key1 in conf.envs[key][arg]:
+                for name, value in conf.envs.items():
                     if key1 == name:
                         print("     " + name + ":")
                         print("         Destination: '" + str(value['dest']) + "'")
@@ -167,7 +218,7 @@ def listName(arg):
                             print("             " + str(idx+1) + ") '" + str(src) + "'")
 
 def listNoGroup():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if not name == 'group':
             print(name + ":")
             print("     Destination: '" + str(value['dest']) + "'")
@@ -177,12 +228,12 @@ def listNoGroup():
 
 
 def listAllGroups():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if name == 'group':
-            for group in envs['group']:
+            for group in conf.envs['group']:
                 print(group + ":")
-                for key in envs['group'][group]:
-                     for name1, value in envs.items():
+                for key in conf.envs['group'][group]:
+                     for name1, value in conf.envs.items():
                         if key == name1:
                             print("     " + name1 + ":")
                             print("         Destination: '" + str(value['dest']) + "'")
@@ -191,32 +242,33 @@ def listAllGroups():
                                 print("             " + str(idx+1) + ") '" + str(src) + "'")
 
 def listGroups():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if name == 'group':
-            for group in envs['group']:
+            for group in conf.envs['group']:
                 print(group + " (group):")
-                for key in envs['group'][group]:
+                for key in conf.envs['group'][group]:
                     print("     " + key)
 
 def listGroupNames():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if name == 'group':
-            for group in envs['group']:
+            for group in conf.envs['group']:
                 print(group)
 
 def listNames():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if not name == 'group':
             print(name) 
 
 def listAllNames():
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if name == 'group':
-            for group in envs['group']:
+            for group in conf.envs['group']:
                 print(group + "(group)")
     listNames()
 
-
+def listFile():
+    print(conf.file)
 
 def filterListDoubles(a):
     # https://stackoverflow.com/questions/9835762/how-do-i-find-the-duplicates-in-a-list-and-create-another-list-with-them
@@ -235,79 +287,89 @@ def SourceComplete():
 
 def exist_name(parser, x):
     not_exists=True
-    if x in envs or x == 'group' or x in envs['group']:
+    with open(conf.file, 'r') as outfile:
+        conf.envs = json.load(outfile)
+        if x in conf.envs or x == 'group' or x in conf.envs['group']:
+            print("The name %s already exists as conf name!" % x)
+            listAll()
+            raise SystemExit 
+        return x
+
+def exist_groupname(parser, x):
+    not_exists=True
+    if x in conf.envs or x == 'group' or x in conf.envs['group']:
         print("The name %s already exists as conf name!" % x)
         listAll()
         raise SystemExit 
-    return x
+    return x 
 
 def get_list_names(special=False):
     names=[]
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
-        for key, name in envs.items():
-            if not key == "group":
-                names.append(key)
-            else:
-                for e in envs['group']:
-                    names.append(e)
-        if special:
-            names.append("all")
-            names.append("all-no-group")
-            names.append("groups")
-            names.append("all-groups")
-            names.append("names")
-            names.append("groupnames")
-            names.append("all-names")
-        return names
+    for key, name in conf.envs.items():
+        if not key == "group":
+            names.append(key)
+        else:
+            for e in conf.envs['group']:
+                names.append(e)
+    if special:
+        names.append("all")
+        names.append("all-no-group")
+        names.append("file")
+        names.append("groups")
+        names.append("all-groups")
+        names.append("names")
+        names.append("groupnames")
+        names.append("all-names")
+    return names
 
 def get_names(special=False):
     names=[]
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
-        for key, name in envs.items():
-            if not key == "group":
-                names.append(key)
-            else:
-                for e in envs['group']:
-                    names.append(e)
-        if special:
-            names.append("all")
-        return names
+    for key, name in conf.envs.items():
+        if not key == "group":
+            names.append(key)
+        else:
+            for e in conf.envs['group']:
+                names.append(e)
+    if special:
+        names.append("all")
+    return names
 
 def get_reg_names():
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
-        names=[]
-        for key, name in envs.items():
-            if not key == "group":
-                names.append(key)
-        return names
+    names=[]
+    for key, name in conf.envs.items():
+        if not key == "group":
+            names.append(key)
+    return names
 
 def get_group_names():
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
-        names=[]
-        for e in envs['group']:
-            names.append(e)
-        return names
+    names=[]
+    for e in conf.envs['group']:
+        names.append(e)
+    return names
+
+def get_names_group(group):
+    names=[]
+    for e in conf.envs['group'][group]:
+        names.append(e)
+    return names
+
 
 def cpt_run(name):
     if name == ['none']:
         raise SystemExit
     if name == ['all']:
-        for i in envs:
+        for i in conf.envs:
             if not i == 'group':
                 print('\n' + i + ':')
-                dest = envs[i]['dest']
-                src = envs[i]['src']
+                dest = conf.envs[i]['dest']
+                src = conf.envs[i]['src']
                 copy_to(dest, src)
     else:
         var = []
         grps = []
         for key in name:
-            if key in envs['group']:
-                var.append(envs['group'][key])
+            if key in conf.envs['group']:
+                var.append(conf.envs['group'][key])
                 grps.append(key)
         var1=[]
         for i in var:
@@ -318,33 +380,33 @@ def cpt_run(name):
                 var1.append(key)
         var1 = filterListDoubles(var1)
         for key in var1:
-            if not key in envs:
+            if not key in conf.envs:
                 print("Look again." + key + " is not known. ")
                 listAllNames()
                 raise SystemExit
         for i in var1:
             i=str(i)
             print('\n' + i + ':')
-            dest = envs[i]['dest']
-            src = envs[i]['src']
+            dest = conf.envs[i]['dest']
+            src = conf.envs[i]['src']
             copy_to(dest, src)
 
 def cpt_run_reverse(name):
     if name == ['none']:
         raise SystemExit
     elif name == ['all']:
-        for i in envs:
+        for i in conf.envs:
             if not i == 'group':
                 print('\n' + i + ':')
-                dest = envs[i]['dest']
-                src = envs[i]['src']
+                dest = conf.envs[i]['dest']
+                src = conf.envs[i]['src']
                 copy_from(dest, src)
     else:
         var = []
         grps = []
         for key in name:
-            if key in envs['group']:
-                var.append(envs['group'][key])
+            if key in conf.envs['group']:
+                var.append(conf.envs['group'][key])
                 grps.append(key)
         var1=[]
         for i in var:
@@ -355,15 +417,15 @@ def cpt_run_reverse(name):
                 var1.append(key)
         var1 = filterListDoubles(var1)
         for key in var1:
-            if not key in envs:
+            if not key in conf.envs:
                 print("Look again. " + key + " isn't a known name.")
                 listAllNames()
                 raise SystemExit
         for i in var1:
             i=str(i)
             print('\n' + i + ':')
-            dest = envs[i]['dest']
-            src = envs[i]['src']
+            dest = conf.envs[i]['dest']
+            src = conf.envs[i]['src']
             copy_from(dest, src)
 
 def prompt_autocomplete():
@@ -378,11 +440,15 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
     res = "all"
     repo = git.Repo("./")
     names = []
-    for name, value in envs.items():
+    for name, value in conf.envs.items():
         if not name == 'group':
             names.append(str(name))
-    res = prompt(prmpt, pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
-    if res == "y":
+        else:
+            for e in conf.envs['group']:
+                names.append(e)
+        names.append("all")
+    res1 = prompt(prmpt, pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+    if res1 == "y":
         res = prompt("Names: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
     else:
         with repo.config_writer() as confw:
@@ -397,6 +463,7 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
 def get_main_parser():
     choices = argcomplete.completers.ChoicesCompleter
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     subparser = parser.add_subparsers(dest='command')
     list1 = subparser.add_parser('list')
     run = subparser.add_parser('run')
@@ -407,32 +474,61 @@ def get_main_parser():
     set_git = subparser.add_parser('set-git')
     add_group = subparser.add_parser('add-group')
     delete_group = subparser.add_parser('delete-group')
+    add_to_group = subparser.add_parser('add-to-group')
+    delete_from_group = subparser.add_parser('delete-from-group')
     reset_destination = subparser.add_parser('reset-destination')
     delete_source = subparser.add_parser('delete-source')
     reset_source = subparser.add_parser('reset-source')
     help1 = subparser.add_parser('help')
     list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=get_list_names(True))
+    list1.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
     run.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    run_reverse.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-
-    #add.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    add.add_argument("name" , type=lambda x: Exist_name(parser, x) ,help="Configuration name", metavar="Configuration name")
+    run.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    run_reverse.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
+    run_reverse.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
+    add.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration name")
     add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory")
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     
+    
     #delete.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    delete.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    delete.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    delete.add_argument("-f","--file" , nargs='+', type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
 
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name")
+    add_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
     #add_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    add_group.add_argument("name" , nargs='+', type=str ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    add_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
     #delete_group.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    delete_group.add_argument("groupname" , type=str ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    delete_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    delete_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
+    
+    add_to_group.add_argument("groupname", type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    add_to_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
+    add_to_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+
+
+    delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    delete_from_group.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
+    delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+
     
     set_git.add_argument("name" , nargs='?' ,type=str ,help="Configuration (group)name", metavar="Configuration (group)name", choices=get_names(True))
+    set_git.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
 
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
+    add_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
     #add_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     #reset_destination.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
@@ -440,9 +536,13 @@ def get_main_parser():
     reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory", help="Destination directory")
     #delete_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     delete_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
+    delete_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
     delete_source.add_argument("src_num" , nargs='*', type=int, metavar="Source files and directories or Index numbers", help="Source files and directories or Index numbers")
     #reset_source.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
+    reset_source.add_argument("-f","--file" , nargs='+',type=lambda x: is_valid_conf(parser, x), help="Configuration file", metavar="Configuration file")
+    
     reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     argcomplete.autocomplete(parser)
     return parser
@@ -454,27 +554,7 @@ def main():
     d = dirname(abspath(__file__))
 
     sys.path.append(d)"""
-    #file=os.path.expanduser("~/.copy_to_confs.json")
     
-    file=os.path.expanduser("~/.config/copy-to/confs.json")
-    complete=os.path.expanduser("~/.config/copy-to/")
-    folder=os.path.expanduser("~/.config/copy-to/")
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)                         
-
-    if not os.path.exists(file):
-        with open(file, "w") as outfile:
-            json.dump({}, outfile)
-
-    with open(file, 'r') as outfile:
-        envs = json.load(outfile)
-
-    with open(file, 'w') as outfile: 
-        if not 'group' in envs:
-            envs['group'] = [] 
-        json.dump(envs, outfile)
-
     parser = get_main_parser()
     args = parser.parse_args()
 
@@ -484,15 +564,15 @@ def main():
     if type(name) is list:
         name = filterListDoubles(name)
     src = filterListDoubles(src)
-                    
-    
+     
+
     if args.command == 'help':
         print("Positional argument 'run' to run config by name")
         parser.print_help()
         raise SystemExit
-    
+
     elif args.command == 'run':
-        if envs == {}:
+        if conf.envs == {} or conf.envs == {"group": []}:
             print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
             raise SystemExit
         elif not args.name:
@@ -503,14 +583,17 @@ def main():
                 except:
                     res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
                 cpt_run(res.split())
+                if args.list:
+                    listName(res)
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit   
         else:
             cpt_run(name.split())
-
+            if args.list:
+                listName(name)
     elif args.command == 'run-reverse':
-        if envs == {}:
+        if conf.envs == {} or conf.envs == {"group": []}:
             print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
             raise SystemExit   
         elif not args.name:
@@ -521,26 +604,32 @@ def main():
                  except:
                     res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
                  cpt_run_reverse(res.split())
+                 if args.list:
+                    listName(res) 
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit
         else:
             cpt_run_reverse(name.split())
-
+            if args.list:
+                listName(name)
     elif args.command == 'set-git':
         if not args.name:
             ask_git()
         else:
            repo = git.Repo("./")
            names = []
-           for name, value in envs.items():
+           for name, value in conf.envs.items():
                 if not name == 'group':
                     names.append(str(name))
            res = prompt(prompt, pre_run=prompt_autocomplete, completer=WordCompleter(names))
            with repo.config_writer() as confw:
-                confw.set_value("copy-to", "run", res)
+               confw.set_value("copy-to", "run", res)
+           if args.list:
+                listName(res)
            print("Added " + str(res) + " to local git configuration")
         
+
     elif args.command == 'add':
         if not 'name' in args:
             print("Give up a configuration name to copy objects between")
@@ -548,11 +637,11 @@ def main():
         elif args.name == 'group' or args.name == 'all':
             print("Name 'group' and 'all' are reserved in namespace")
             raise SystemExit
-        elif name in envs:
+        elif name in conf.envs:
             print("Look again. " + str(name) + " is/are already used as name.")
             listNames()
             raise SystemExit
-        elif name in envs['group']:
+        elif name in conf.envs['group']:
             print("Look again. " + str(name) + " is/are already used as groupname.")
             listGroupNames()
             raise SystemExit
@@ -563,11 +652,13 @@ def main():
             print("Destination and source can't be one and the same")
             raise SystemExit
         else:
-            with open(file, 'w') as outfile: 
-                envs[str(name)] = { 'dest' : str(dest), 'src' : [*src] }
-                json.dump(envs, outfile)
+            with open(conf.file, 'w') as outfile: 
+                conf.envs[str(name)] = { 'dest' : str(dest), 'src' : [*src] }
+                json.dump(conf.envs, outfile)
             args.name = name
-            args.command = 'list'
+            if args.list:
+                listName(name)
+            print(str(args.name) + ' added to configuration file')
 
     elif args.command == 'add-group':
         if not 'groupname' in args:
@@ -576,36 +667,66 @@ def main():
         elif args.groupname == 'group' or args.groupname == 'all' :
             print("Name 'group' and 'all' are reserved in namespace")
             raise SystemExit
-        elif args.groupname in envs:
+        elif args.groupname in conf.envs:
             print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
             raise SystemExit
-        elif args.groupname in envs['group']:
+        elif args.name in get_names(False):
+            print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
+            raise SystemExit
+        elif args.groupname in conf.envs['group']:
             print("Change " + str(args.groupname) + ". It's already taken")
             raise SystemExit
         else:
             groups = []
             for key in name:
-                if not key in envs:
+                if not key in conf.envs:
                     print("Look again. " + key + " isn't in there.")
                     listGroupNames()
                     raise SystemExit
-            with open(file, 'w') as outfile: 
+            with open(conf.file, 'w') as outfile: 
                 for key in name:
                     groups.append(key)
-                envs['group'] = { args.groupname : groups }
+                conf.envs['group'][args.groupname] = groups
+                if args.list:
+                    listName(args.groupname)
                 print(str(args.groupname) + ' added to group settings')
-                json.dump(envs, outfile)
-    
+                json.dump(conf.envs, outfile)
+
+    elif args.command == 'add-to-group':
+        if not 'groupname' in args:
+            print("Give up an configuration to copy objects between")
+            raise SystemExit
+        elif not args.groupname in conf.envs['group']:
+            print(str(args.groupname) + ". Doesn't exist. Look again.")
+            listGroupNames()
+            raise SystemExit
+        else:
+            groupnames = []
+            with open(conf.file, 'w') as outfile: 
+                groupnames = conf.envs['group'][args.groupname]
+                for known in groupnames:
+                    for n in args.name:
+                        if known == n:
+                            print("Look again. " + known + " is already in " + args.groupname)
+                            listAllGroups()
+                            raise SystemExit
+                for key in name:
+                    conf.envs['group'][args.groupname].append(key)
+                json.dump(conf.envs, outfile)
+            if args.list:
+                    listName(args.groupname)
+            print(str(args.name) + ' added to ' + str(args.groupname))
+
     elif args.command == 'delete':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an configuration with -a, --add first to copy all it's files to destination")
+        elif conf.envs == {} or os.stat(conf.file).st_size == 0:
+            print("Add an configuration with add first to copy all it's files to destination")
             raise SystemExit
         else:
             for key in name:
-                if not key in envs:
+                if not key in conf.envs:
                     print("Look again. '" + key + "' isn't a known name")
                     listAllNames()
                     raise SystemExit
@@ -613,10 +734,12 @@ def main():
                 if name == 'group':
                     print("Name 'group' is reserved for addressing groups of dest/src at once")
                     raise SystemExit
-                envs.pop(key)
+                conf.envs.pop(key)
+                if args.list:
+                    listNoGroup()
                 print(str(key) + ' removed from existing settings')
-            with open(file, 'w') as outfile:
-                json.dump(envs, outfile)
+            with open(conf.file, 'w') as outfile:
+                json.dump(conf.envs, outfile)
     
     elif args.command == 'delete-group':
         if not 'groupname' in args:
@@ -625,16 +748,44 @@ def main():
         elif args.groupname == 'group':
             print("Name 'group' is reserved to keep track of groupnames")
             raise SystemExit
-        elif not args.groupname in envs['group']:
+        elif not args.groupname in conf.envs['group']:
             print("Look again." + str(args.groupname) + " is not in known groups")
             listGroups()
             raise SystemExit
         else:
-            envs['group'].pop(args.groupname)
+            conf.envs['group'].pop(args.groupname)
+            if args.list:
+                listGroups()
             print(str(args.groupname) + ' removed from existing settings')
-            with open(file, 'w') as outfile:
-                json.dump(envs, outfile)
+            with open(conf.file, 'w') as outfile:
+                json.dump(conf.envs, outfile)
+    
+    elif args.command == 'delete-from-group':
+        if not 'groupname' in args:
+            print("Give up an configuration to copy objects between")
+            raise SystemExit
+        elif not args.groupname in conf.envs['group']:
+            print(str(args.groupname) + ". Doesn't exist. Look again.")
+            listGroupNames()
+            raise SystemExit
+        else:
+            groupnames = []
+            with open(conf.file, 'w') as outfile: 
+                groupnames = conf.envs['group'][args.groupname]
+                for known in groupnames:
+                    for n in args.name:
+                        if known == n:
+                            conf.envs['group'][args.groupname].remove(known)
+                            args.name.remove(n)
+                            if args.list:
+                                listName(args.groupname) 
+                            print(str(n) + ' removed from ' + str(args.groupname))
+                json.dump(conf.envs, outfile)
+                if not args.name == []:
+                    print("Look again. " + str(args.name) + " isn't/aren't in " + str(args.groupname))
+                    raise SystemExit
                 
+
     elif args.command == 'add-source':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
@@ -642,26 +793,28 @@ def main():
         elif not 'src' in args:
             print("Give up a new set of source files and folders to copy objects between")
             raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
+        elif conf.envs == {} or os.stat(conf.file).st_size == 0:
             print("Add an configuration with 'copy-to add' first to copy all it's files to destination")
             raise SystemExit
-        elif not name in envs:
+        elif not name in conf.envs:
             print("Look again. " + str(name) + " isn't a known name.")
             listNames()
             raise SystemExit
-        elif envs[name]['dest'] in src:
+        elif conf.envs[name]['dest'] in src:
             print('Destination and source can"t be one and the same')
             raise SystemExit
         else:
             src = [*src]
-            with open(file, 'w') as outfile:
+            with open(conf.file, 'w') as outfile:
                 for i in src:
-                    if i in envs[name]['src']:
+                    if i in conf.envs[name]['src']:
                         print(str(i) + " already in source of " + str(name))
                     else:
-                        envs[name]["src"].append(i)
+                        conf.envs[name]["src"].append(i)
+                        if args.list:
+                            listName(name)
                         print('Added' + str(i) + ' to source of ' + str(name))
-                json.dump(envs, outfile)
+                json.dump(conf.envs, outfile)
     
     elif args.command == 'reset-destination':
         if not 'name' in args:
@@ -670,20 +823,22 @@ def main():
         elif not 'dest' in args:
             print("Give up a new destination folder to copy objects between")
             raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
-            print("Add an configuration with -a, --add first to copy all it's files to destination")
+        elif conf.envs == {} or os.stat(conf.file).st_size == 0:
+            print("Add an configuration with add first to copy all it's files to destination")
             raise SystemExit
-        elif not name in envs:
+        elif not name in conf.envs:
             print("Look again. " + str(name) + " isn't a known name.")
             listNames()
             raise SystemExit
-        elif dest in envs[name]['src']:
+        elif dest in conf.envs[name]['src']:
             print('Destination and source can"t be one and the same')
             raise SystemExit
         else:
-            with open(file, 'w') as outfile:
-                envs[name]['dest'] = str(dest)
-                json.dump(envs, outfile)
+            with open(conf.file, 'w') as outfile:
+                conf.envs[name]['dest'] = str(dest)
+                json.dump(conf.envs, outfile)
+            if args.list:
+                listName(name)
             print('Reset destination of '+ str(name) +' to', dest)
     
     elif args.command == 'delete-source':
@@ -693,30 +848,29 @@ def main():
         elif not 'src_num' in args:
             print("Give up the indices of the directories and files to be deleted from configuration")
             raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
+        elif conf.envs == {} or os.stat(conf.file).st_size == 0:
             print("Add an configuration with add first to copy all it's files to destination")
             raise SystemExit
-        elif not name in envs:
+        elif not name in conf.envs:
             print("Look again. " + str(name) + " isn't in there.")
             raise SystemExit
-        elif envs[name]['dest'] in src:
+        elif conf.envs[name]['dest'] in src:
             print("Destination and source can't be one and the same")
             raise SystemExit
         else:
             for i in args.src_num:
-                if i > len(envs[name]['src']):
+                if i > len(conf.envs[name]['src']):
                     print("One of the given indices exceeds the amount of sources")
                     raise SystemExit
-            src = envs[name]['src']
+            src = conf.envs[name]['src']
             for i in args.src_num:
                 src.pop(i - 1)
-            with open(file, 'w') as outfile:
-                envs[name].update({ "src" : [*src] })
-                json.dump(envs, outfile)
-            print("     Destination:     '" + str(envs[name]['dest']) + "'")
-            print("     Source:")
-            for idx, src in enumerate(envs[name]['src']):
-                print("          " + str(idx+1) + ") '" + str(src) + "'")
+            with open(conf.file, 'w') as outfile:
+                conf.envs[name].update({ "src" : [*src] })
+                json.dump(conf.envs, outfile)
+            if args.list:
+                listName(name)
+            print('Deleted source of '+ str(name))
 
     elif args.command == 'reset-source':
         if not 'name' in args:
@@ -725,21 +879,23 @@ def main():
         elif not 'src' in args:
             print("Give up a new set of source files and folders to copy objects between")
             raise SystemExit
-        elif envs == {} or os.stat(file).st_size == 0:
+        elif conf.envs == {} or os.stat(conf.file).st_size == 0:
             print("Add an configuration with -a, --add first to copy all it's files to destination")
             raise SystemExit
-        elif not name in envs:
+        elif not name in conf.envs:
             print("Look again. " + str(name) + " isn't in there.")
             listNames()
             raise SystemExit
-        elif envs[name]['dest'] in src:
+        elif conf.envs[name]['dest'] in src:
             print('Destination and source can"t be one and the same')
             raise SystemExit
         else:
-            with open(file, 'w') as outfile:
-                envs[name].update({ "src" : [*src] })
-                json.dump(envs, outfile)
-            print('Reset source of '+ str(name) + ' to', src)
+            with open(conf.file, 'w') as outfile:
+                conf.envs[name].update({ "src" : [*src] })
+                json.dump(conf.envs, outfile)
+            if args.list:
+                listName(name)
+            print('Reset source of '+ str(name) + ' to', str(src))
 
     if args.command == None :
         parser.print_help()

@@ -1,93 +1,113 @@
-# copy-to
+## Copy-to
 
-A little python script i use in conjunction with git so you can easily copy config files from anywhere in an instant to do whatever with!
+A little python script I use in conjunction with git so you can easily copy (config) files located outside of a git repository to one (or to wherever you want to).  
 
-Depends on [argcomplete](https://pypi.org/project/argcomplete/), [GitPython](https://pypi.org/project/GitPython/), [prompt_toolkit](https://pypi.org/project/prompt_toolkit/)
+Depends on [argcomplete](https://pypi.org/project/argcomplete/), [GitPython](https://pypi.org/project/GitPython/), [prompt_toolkit](https://pypi.org/project/prompt_toolkit/)  
 
-Install it with:
+## Install it with:  
 
+Linux:  
 ```
+sudo apt install pipx / sudo pacman -S python-pipx
 pipx install copy-to
+```  
+Windows:  
 ```
+iwr -useb get.scoop.sh | iex
+scoop install pipx
+pipx install copy-to
+```  
+
 Try running it once if autocompletions aren't working
 
-``` 
-sudo activate-global-python-argcomplete
+You can also run (on Linux):  
 ```
-for installing pythoncompletions globally.
+sudo activate-global-python-argcomplete
+```  
+for installing pythoncompletions globally.  
+
 
 Add a pairset of destination folder - source files and/or directories with  
 ```
 copy-to add myname destination_folder sourcefile1 (sourcefolder1 sourcefile2 sourcefile3 sourcefolder2/*) ...
-```
-
-List configured paths and files with  
-```
-copy-to list myname
 ```  
-or just  
-```
-copy-to list
-```
-'names' and 'groups' to list all names and groups respectively  
-You can also use 'all' to list/run all regular names  
-
 
 Copy the files to their destination by running  
 ```
 copy-to run myname1 (myname2)
-```
+```  
 
 Or copy the files back to source by running  
 ```
 copy-to run-reverse myname1 (myname2)
-```
+```  
 
-Run and run-reverse can run without arguments when present in a git repository that has configured copy-to. Does not work with global gitconfig.  
-
+Run and run-reverse can run without arguments when present in a git repository that has configured copy-to (Excluding global gitconfig). This is so it can be hooked to a git macro more easily, f.ex. on startup of [Lazygit](https://github.com/jesseduffield/lazygit).  
 ```
 [copy-to]
     run = myname1 myname2
-```
-
+```  
 This can be setup with `copy-to add myname` and `copy-to set-git myname` or  
-`copy-to add myname` and `copy-to run` after wich a prompt will ask if you want to set it up with git.  
+`copy-to add myname` and `copy-to run`/`copy-to run-reverse` after wich a prompt will ask if you want to set it up with git. Both `copy-to run` and `copy-to run-reverse` will run using the same `run` arguments  
+
+
+List configured paths and files with  
+```
+copy-to list myname/mygroupname/all/all-no-group/groups/all-groups/names/groupnames/all-names
+```  
+or as a flag  
+```
+copy-to --list othercommand
+```
+'all-no-group' and 'groups' to list all regular configs and groups respectively  
+'names' and 'groupnames' to list just the regular names and groupnames respectively  
+You can also use 'all' to list/run all known configurartions  
 
 
 Delete set of dest/src by name with  
 ```
 copy-to delete myname1 (myname2)
-```
+```  
 
 Add sources with  
 ```
-copy-to add_source myname folder1 file1
-```
+copy-to add-source myname folder1 file1
+```  
 
-Delete source by index with
+Delete source by index with  
 ```
-copy-to delete_source myname 1 4 7
-```
+copy-to delete-source myname 1 4 7
+```  
 
-Reset source and destination folders
+Reset source and destination folders  
 ```
-copy-to reset_source myname
-copy-to reset_destination myname newDest
-```
+copy-to reset-source myname
+copy-to reset-destination myname newDest
+```  
 
-Groups are based on names. For copying to multiple directories in one go.
-Takes up 'group' as config namespace.
+Groups are based on names. For copying to multiple directories in one go.  
+Groupnames 'group'/'all' cannot be used.  
 
-Add groupname
+Add groupname  
 ```
-copy-to add_group mygroupname myname1 myname2
-```
+copy-to add-group mygroupname myname1 myname2
+```  
 
 Delete groupname
 ```
-copy-to delete_group mygroupname
-```
+copy-to delete-group mygroupname
+```  
 
-Configuration files at `~/.config/copy-to/confs.json` for Linux  
+Add name to group  
+```
+copy-to add-to-group mygroupname myname1 myname2
+```  
+
+Delete name from group  
+```
+copy-to delete-from-group mygroupname myname1 myname2
+```  
+
+At default the configuration file is located at `~/.config/copy-to/confs.json`, but you can set a environment variable `COPY_TO` to change this, or pass a `-f, --file` flag.  
 
 Windows and mac not tested
