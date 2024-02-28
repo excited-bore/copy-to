@@ -1,6 +1,7 @@
-#i!/usr/bin/env python
+#!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 import os
+import platform
 import shutil
 import json
 import sys
@@ -16,7 +17,11 @@ from git import Repo
 from pathlib import Path 
 import subprocess
 
-os.popen("eval $(register-python-argcomplete copy-to)").read()
+if platform.system() == 'Linux' or platform.system() == 'Darwin':
+    os.popen("eval $(register-python-argcomplete copy-to)").read()
+elif platform.system() == 'Windows':
+    pass
+    #os.popen("register-python-argcomplete --shell powershell copy-to | Out-String | Invoke-Expression").read()
 
 class Conf:
     def __init__(self):
@@ -31,12 +36,13 @@ class Conf:
         self.readfile()
 
     def readfile(self):
+        if not os.path.exists(self.file):
+            with open(self.file, "w") as outfile:
+                self.envs = {}
+                self.envs['group'] = [] 
+                json.dump(self.envs, outfile)
         with open(self.file, 'r') as infile: 
             self.envs = json.load(infile)
-            if not 'group' in self.envs:
-                self.envs['group'] = [] 
-        with open(self.file, 'w') as outfile: 
-            json.dump(self.envs, outfile)
 
 
 conf = Conf()
@@ -84,7 +90,7 @@ def is_names_or_group(parser, arg):
         listName(arg)
         return arg
     elif arg == 'names':
-        listnames()
+        listNames()
         return arg
     elif arg == 'all-no-group':
         listNoGroup()
@@ -561,13 +567,21 @@ def get_main_parser():
 
     reset_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
     reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
-    
-    argcomplete.autocomplete(parser)
+    output_stream = None
+    if "_ARGCOMPLETE_POWERSHELL" in os.environ:
+        output_stream = codecs.getwriter("utf-8")(sys.stdout.buffer)
+
+    argcomplete.autocomplete(parser, output_stream=output_stream)
     return parser
 
 def main():
     """
-    os.popen("eval $(register-python-argcomplete copy-to)").read()
+    if platform.system() == 'Linux' or platform.system() == 'Darwin':
+        os.popen("eval $(register-python-argcomplete copy-to)").read()
+    elif platform.system() == 'Windows':
+        pass
+        #os.popen("register-python-argcomplete --shell powershell copy-to | Out-String | Invoke-Expression").read()
+
     from os.path import dirname, abspath
     d = dirname(abspath(__file__))
 
@@ -590,10 +604,7 @@ def main():
         raise SystemExit
 
     elif args.command == 'run':
-        if conf.envs == {} or conf.envs == {"group": []}:
-            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
-            raise SystemExit
-        elif not args.name:
+        if not args.name:
             if is_git_repo("./"):
                 repo = git.Repo("./")
                 try:
@@ -606,15 +617,15 @@ def main():
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit   
+        elif conf.envs == {} or conf.envs == {"group": []}:
+            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
+            raise SystemExit
         else:
             cpt_run(name.split())
             if args.list:
                 listName(name)
     elif args.command == 'run-reverse':
-        if conf.envs == {} or conf.envs == {"group": []}:
-            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
-            raise SystemExit   
-        elif not args.name:
+        if not args.name:
             if is_git_repo("./"):
                  res = 'all'
                  try:
@@ -627,6 +638,9 @@ def main():
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit
+        elif conf.envs == {} or conf.envs == {"group": []}:
+            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
+            raise SystemExit   
         else:
             cpt_run_reverse(name.split())
             if args.list:
@@ -645,7 +659,7 @@ def main():
                         names.append(str(name))
                res = prompt("Names: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
                if res == '':
-                   res = "all" 
+                   res = "all"
            else:
                res = args.value
            with repo.config_writer() as confw:
@@ -848,7 +862,7 @@ def main():
                         conf.envs[name]["src"].append(i)
                         if args.list:
                             listName(name)
-                        print('Added' + str(i) + ' to source of ' + str(name))
+                        print('Added ' + str(i) + ' to source of ' + str(name))
                 json.dump(conf.envs, outfile)
     
     elif args.command == 'reset-destination':
@@ -934,7 +948,7 @@ def main():
 
     elif args.command == None and args.list:
         listAll()
-    else:
+    elif not args.command and not args.list:
         parser.print_help()
 
 
