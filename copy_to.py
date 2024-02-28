@@ -67,7 +67,14 @@ def is_valid_dir(parser, arg):
         raise SystemExit              
     else:
         print("The directory %s does not exist!" % arg)
-        raise SystemExit
+        res = prompt("Do you want to create the directory " + arg + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+        if res == "y":
+            try:
+                os.makedirs(arg)
+                return os.path.abspath(arg)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise SystemExit
 
 def is_names_or_group(parser, arg):
     if arg == 'all':
@@ -180,6 +187,12 @@ def is_valid_file_or_dir(parser, arg):
 
 def copy_to(dest, src):
     for element in src:
+        if not os.path.exists(dest):
+            prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            if res == "y":
+                os.makedirs(dest)
+            else:
+                raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
         if os.path.isfile(element):
             shutil.copy2(element, exist_dest)
@@ -191,6 +204,12 @@ def copy_to(dest, src):
 
 def copy_from(dest, src):
     for element in src:
+        if not os.path.exists(dest):
+            prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            if res == "y":
+                os.makedirs(dest)
+            else:
+                raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
         if os.path.isfile(exist_dest):
             shutil.copy2(exist_dest, element)
@@ -653,8 +672,8 @@ def main():
         if not 'name' in args:
             print("Give up a configuration name to copy objects between")
             raise SystemExit
-        elif args.name == 'group' or args.name == 'all':
-            print("Name 'group' and 'all' are reserved in namespace")
+        elif args.name == 'none' or args.name == 'group' or args.name == 'all':
+            print("Name 'none', 'group' and 'all' are reserved in namespace")
             raise SystemExit
         elif name in conf.envs:
             print("Look again. " + str(name) + " is/are already used as name.")
@@ -663,9 +682,6 @@ def main():
         elif name in conf.envs['group']:
             print("Look again. " + str(name) + " is/are already used as groupname.")
             listGroupNames()
-            raise SystemExit
-        elif name == 'all':
-            print("Name 'all' is reserved for addressing all dest/src sets at once")
             raise SystemExit
         elif str(dest) in src:
             print("Destination and source can't be one and the same")
@@ -683,13 +699,13 @@ def main():
         if not 'groupname' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
-        elif args.groupname == 'group' or args.groupname == 'all' :
-            print("Name 'group' and 'all' are reserved in namespace")
+        elif args.groupname == 'none' or args.groupname == 'group' or args.groupname == 'all' :
+            print("Name 'none', 'group' and 'all' are reserved in namespace")
             raise SystemExit
         elif args.groupname in conf.envs:
             print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
             raise SystemExit
-        elif args.name in get_names(False):
+        elif args.groupname in get_names(False):
             print("Can't have both the same groupname and regular name. Change " + str(args.groupname))
             raise SystemExit
         elif args.groupname in conf.envs['group']:
