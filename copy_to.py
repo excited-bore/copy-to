@@ -495,10 +495,24 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
     else:
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "run", 'none')
-    res = conf.file
     res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): ", pre_run=prompt_autocomplete, completer=PathCompleter())
+    res = os.path.realpath(os.path.expanduser(res))
     if not res:
         res = conf.file
+    elif not os.path.exists(res):
+        print("The file %s does not exist!" % res)
+        res1 = prompt("Do you want to create " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+        if res1 == "y":
+            try:
+                if not os.path.exists(os.path.dirname(res)):
+                    os.makedirs(os.path.dirname(res))
+                with open(res, "w") as outfile:
+                    conf.envs = {}
+                    conf.envs['group'] = [] 
+                    json.dump(conf.envs, outfile)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise SystemExit
     elif not res.endswith('.json'):
         print("The file " + str(res) + " is not a .json file")
         raise SystemExit
@@ -674,7 +688,24 @@ def main():
                res = args.value
            else: 
                res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): " , pre_run=prompt_autocomplete, completer=PathCompleter())
-           if not res.endswith('.json'):
+           res = os.path.realpath(os.path.expanduser(res))
+           if not res:
+               res = conf.file
+           elif not os.path.exists(res):
+                print("The file %s does not exist!" % res)
+                res1 = prompt("Do you want to create it " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+                if res1 == "y":
+                    try:
+                        if not os.path.exists(os.path.dirname(res)):
+                            os.makedirs(os.path.dirname(res))
+                        with open(res, "w") as outfile:
+                            conf.envs = {}
+                            conf.envs['group'] = [] 
+                            json.dump(conf.envs, outfile)
+                    except OSError as e:
+                        if e.errno != errno.EEXIST:
+                            raise SystemExit
+           elif not res.endswith('.json'):
                print("The file " + str(res) + " must be a '.json' file")
                raise SystemExit
            with repo.config_writer() as confw:
