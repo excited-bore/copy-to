@@ -13,15 +13,16 @@ Linux:
 sudo apt install pipx / sudo pacman -S python-pipx
 pipx install copy-to
 ```  
+
 Windows Powershell:  
 ```
 winget install python3
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-python3 -m pipx install copy-to
+python -m pip install --user pipx
+python -m pipx ensurepath
+python -m pipx install copy-to
 ```  
 
-On linux, try running it once if autocompletions aren't working
+On linux, try running it once if autocompletions aren't working  
 
 You can also run:  
 ```
@@ -30,7 +31,7 @@ sudo activate-global-python-argcomplete
 
 Sadly I have been unable to figure out as of now how to setup autocompletions on Windows.  
 
-## How to use it:
+## How to use it:  
 
 Add a pairset of destination folder - source files and/or directories with  
 ```
@@ -47,9 +48,32 @@ Or copy the files back to source by running
 copy-to run-reverse myname1 (myname2)
 ```  
 
-When the destination is missing, a prompt will ask you if you want to create the destination folder.
+When the destination is missing, a prompt will ask you if you want to create the destination folder.  
 
-Run and run-reverse can also run without arguments when present in a git repository that has configured copy-to (Excluding global gitconfig). This is so it can be hooked to a git macro more easily, f.ex. with an alias (alias git-status="git status && copy-to run") or on startup of [Lazygit](https://github.com/jesseduffield/lazygit).  
+Run and run-reverse can also run without arguments when git is installed and present in a git local repository that has configured copy-to. This is so it can be hooked to a git macro more easily, f.ex. with an alias/function  
+
+Windows Powershell:  
+```
+function git-status { copy-to.exe run && git.exe status }
+```  
+Linux bash:  
+```
+alias git-status="copy-to run && git status"
+```  
+
+or for those who use it, on startup of [Lazygit](https://github.com/jesseduffield/lazygit):  
+
+Windows Powershell:  
+```
+function lazygit { copy-to.exe run && lazygit.exe }
+```  
+
+Linux bash:  
+```
+alias lazygit="copy-to run && lazygit"
+```  
+
+Local git config:  
 ```
 [copy-to]  
     run = myname1 myname2  
@@ -63,7 +87,19 @@ This can be setup with `copy-to add myname` and `copy-to set-git myname` or
 
 This will setup a git repository for your firefox configuration files using copy-to on Windows.  
 
-### Initialize git repository and setup copy-to
+### Install git, initialize git repository and setup copy-to
+
+We start with installing git if it's not installed already.  
+
+```
+winget install Git.Git
+```  
+
+(Optional: get latest version of PowerShell)  
+
+```
+winget install Microsoft.PowerShell
+```  
 
 ![Setup git](https://raw.githubusercontent.com/excited-bore/copy-to/main/images/Setup_git.gif "Setup git")  
 

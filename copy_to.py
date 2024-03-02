@@ -8,14 +8,17 @@ import sys
 import errno
 import argparse
 import argcomplete
-import git
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.application.current import get_app
-from git import Repo
 from pathlib import Path 
 import subprocess
+import distutils.spawn
+if distutils.spawn.find_executable("git"):
+   import git
+   from git import Repo
+
 
 if platform.system() == 'Linux' or platform.system() == 'Darwin':
     os.popen("eval $(register-python-argcomplete copy-to)").read()
@@ -48,11 +51,14 @@ class Conf:
 conf = Conf()
 
 def is_git_repo(path):
+    if not distutils.spawn.find_executable("git"):
+        return False
     try:
         repo = git.Repo(path).git_dir
         return True
     except git.exc.InvalidGitRepositoryError:
         return False
+
 
 if is_git_repo("./"):
     try:
@@ -533,7 +539,8 @@ def get_main_parser():
     add = subparser.add_parser('add')
     delete = subparser.add_parser('delete')
     add_source = subparser.add_parser('add-source')
-    set_git = subparser.add_parser('set-git')
+    if distutils.spawn.find_executable("git"):
+        set_git = subparser.add_parser('set-git')
     add_group = subparser.add_parser('add-group')
     delete_group = subparser.add_parser('delete-group')
     add_to_group = subparser.add_parser('add-to-group')
@@ -564,11 +571,12 @@ def get_main_parser():
     delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
     delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
     
-    git_command = set_git.add_subparsers(dest='gitcommand')
-    git_run = git_command.add_parser('run')
-    git_run.add_argument("value" , nargs='?' ,type=str , help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    git_file = git_command.add_parser('file')
-    git_file.add_argument("value" , nargs='?' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
+    if distutils.spawn.find_executable("git"):
+        git_command = set_git.add_subparsers(dest='gitcommand')
+        git_run = git_command.add_parser('run')
+        git_run.add_argument("value" , nargs='?' ,type=str , help="Configuration name", metavar="Configuration name", choices=get_names(True))
+        git_file = git_command.add_parser('file')
+        git_file.add_argument("value" , nargs='?' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
     
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
@@ -977,7 +985,7 @@ def main():
                 listName(name)
             print('Reset source of '+ str(name) + ' to', str(src))
 
-    elif args.command == None and args.list:
+    elif (args.command == 'list' and not args.name) or (args.command == None and args.list):
         listAll()
     elif not args.command and not args.list:
         parser.print_help()
