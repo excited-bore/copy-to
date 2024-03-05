@@ -5,6 +5,7 @@ import platform
 import shutil
 import json
 import sys
+import pathlib
 import errno
 import argparse
 import argcomplete
@@ -12,7 +13,7 @@ from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.application.current import get_app
-from pathlib import Path 
+from pathlib import Path
 import subprocess
 import distutils.spawn
 if distutils.spawn.find_executable("git"):
@@ -22,9 +23,20 @@ if distutils.spawn.find_executable("git"):
 
 if platform.system() == 'Linux' or platform.system() == 'Darwin':
     os.popen("eval $(register-python-argcomplete copy-to)").read()
-elif platform.system() == 'Windows':
-    pass
-    #os.popen("register-python-argcomplete --shell powershell copy-to | Out-String | Invoke-Expression").read()
+#elif platform.system() == 'Windows' and os.popen("powershell.exe Get-ExecutionPolicy").read() != "Restricted\n":
+    #if os.popen("powershell.exe Get-Module -ListAvailable -Name copy-to").read() == '':
+    #    import tempfile
+    #    import subprocess
+    #    res = os.popen("where.exe register-python-argcomplete").read()
+    #    res = res.partition('\n')[0]
+    #    res = os.popen("python " + res + " --shell powershell copy-to.exe").read()
+    #    temp = tempfile.NamedTemporaryFile(prefix='copy-to', suffix='.psm1', delete=False)
+    #    temp.write(bytes(res, 'utf-8'))
+    #    temp.close()
+    #    subprocess.run(["powershell.exe", "-Command", "Import-Module " + temp.name], check=True)
+        #os.popen("powershell.exe -C Import-Module " + temp.name)
+        #os.popen("python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe | Out-String | Invoke-Expression").read()
+        #subprocess.Popen(["powershell.exe", "-c", "python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe | Out-String | Invoke-Expression"], stdout=subprocess.PIPE, stderr=None)
 
 class Conf:
     def __init__(self):
@@ -63,7 +75,7 @@ def is_git_repo(path):
 if is_git_repo("./"):
     try:
         repo = git.Repo("./")
-        res = repo.config_reader().get_value("copy-to", "file")
+        res = os.path.realpath(repo.config_reader().get_value("copy-to", "file"))
         if res:
             conf.file = os.path.abspath(res)
             conf.folder = os.path.dirname(res)
@@ -200,7 +212,7 @@ def is_valid_file_or_dir(parser, arg):
 def copy_to(dest, src):
     for element in src:
         if not os.path.exists(dest):
-            prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
             if res == "y":
                 os.makedirs(dest)
             else:
@@ -217,7 +229,7 @@ def copy_to(dest, src):
 def copy_from(dest, src):
     for element in src:
         if not os.path.exists(dest):
-            prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
             if res == "y":
                 os.makedirs(dest)
             else:
@@ -429,7 +441,7 @@ def cpt_run(name):
         var1 = filterListDoubles(var1)
         for key in var1:
             if not key in conf.envs:
-                print("Look again." + key + " is not known. ")
+                print("Look again. " + key + " is not known. ")
                 listAllNames()
                 raise SystemExit
         for i in var1:
@@ -497,35 +509,46 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         names.append("all")
     res1 = prompt(prmpt, pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
     if res1 == "y":
-        res = prompt("Names: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
-    else:
+        res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): ", pre_run=prompt_autocomplete, completer=PathCompleter())
+        res = os.path.realpath(os.path.expanduser(res))
+        if not res:
+            res = conf.file
+        elif not os.path.exists(res):
+            print("The file %s does not exist!" % res)
+            res1 = prompt("Do you want to create " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            if res1 == "y":
+                try:
+                    if not os.path.exists(os.path.dirname(res)):
+                        os.makedirs(os.path.dirname(res))
+                    with open(res, "w") as outfile:
+                        conf.envs = {}
+                        conf.envs['group'] = [] 
+                        json.dump(conf.envs, outfile)
+                except OSError as e:
+                    if e.errno != errno.EEXIST:
+                        raise SystemExit
+        elif not res.endswith('.json'):
+            print("The file " + str(res) + " is not a .json file")
+            raise SystemExit
+        git_path = pathlib.Path(os.path.dirname(repo.git_dir))
+        res_path = pathlib.Path(res)
+        if git_path in res_path.parents:
+            res = str(res_path.relative_to(os.path.dirname(git.Repo("./").git_dir)))
         with repo.config_writer() as confw:
-            confw.set_value("copy-to", "run", 'none')
-    res = prompt("File: ('.json' file - can be nonexistant - Empty: " + str(conf.file) + "): ", pre_run=prompt_autocomplete, completer=PathCompleter())
-    res = os.path.realpath(os.path.expanduser(res))
-    if not res:
-        res = conf.file
-    elif not os.path.exists(res):
-        print("The file %s does not exist!" % res)
-        res1 = prompt("Do you want to create " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
-        if res1 == "y":
-            try:
-                if not os.path.exists(os.path.dirname(res)):
-                    os.makedirs(os.path.dirname(res))
-                with open(res, "w") as outfile:
-                    conf.envs = {}
-                    conf.envs['group'] = [] 
-                    json.dump(conf.envs, outfile)
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise SystemExit
-    elif not res.endswith('.json'):
-        print("The file " + str(res) + " is not a .json file")
-        raise SystemExit
-    with repo.config_writer() as confw:
-        confw.set_value("copy-to", "file", res)
-    print("Added " + str(res) + " to local git configuration")
-    return res
+            confw.set_value("copy-to", "file", res)
+        print("Added file = " + str(res) + " to local git configuration")
+        res = prompt("Run: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
+        with repo.config_writer() as confw:
+            confw.set_value("copy-to", "run", res)
+        print("Added run = " + str(res) + " to local git configuration")
+        return res
+    else:
+        res1 = prompt("You selected no. Prevent this popup from coming up again? [y/n]:", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+        if res1 == 'y':
+           with repo.config_writer() as confw:
+                confw.set_value("copy-to", "run", "none")
+           print("Added run = none to local git configuration")
+        return False
 
 def get_main_parser():
     choices = argcomplete.completers.ChoicesCompleter
@@ -601,8 +624,8 @@ def main():
     if platform.system() == 'Linux' or platform.system() == 'Darwin':
         os.popen("eval $(register-python-argcomplete copy-to)").read()
     elif platform.system() == 'Windows':
-        pass
-        #os.popen("register-python-argcomplete --shell powershell copy-to | Out-String | Invoke-Expression").read()
+        os.popen("python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe | Out-String | Invoke-Expression").read()
+
 
     from os.path import dirname, abspath
     d = dirname(abspath(__file__))
@@ -633,9 +656,10 @@ def main():
                     res = repo.config_reader().get_value("copy-to", "run")
                 except:
                     res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
-                cpt_run(res.split())
-                if args.list:
-                    listName(res)
+                if res:
+                    cpt_run(res.split())
+                    if args.list:
+                        listName(res)
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit   
@@ -654,9 +678,10 @@ def main():
                     res = repo.config_reader().get_value("copy-to", "run")
                  except:
                     res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
-                 cpt_run_reverse(res.split())
-                 if args.list:
-                    listName(res) 
+                 if res:
+                    cpt_run_reverse(res.split())
+                    if args.list:
+                        listName(res)
             else:
                 print("No name given and not in a git repository. Give up an configuration to copy objects between")
                 raise SystemExit
@@ -679,7 +704,7 @@ def main():
                for name, value in conf.envs.items():
                     if not name == 'group':
                         names.append(str(name))
-               res = prompt("Names: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
+               res = prompt("Run: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
                if res == '':
                    res = "all"
            else:
@@ -712,10 +737,15 @@ def main():
                             json.dump(conf.envs, outfile)
                     except OSError as e:
                         if e.errno != errno.EEXIST:
-                            raise SystemExit
+                            raise SystemExit                     
            elif not res.endswith('.json'):
                print("The file " + str(res) + " must be a '.json' file")
                raise SystemExit
+           git_path = pathlib.Path(os.path.dirname(git.Repo("./").git_dir))
+           res_path = pathlib.Path(res)
+           if git_path in res_path.parents:
+               res = str(res_path.relative_to(os.path.dirname(git.Repo("./").git_dir)))
+               #res = os.path.relpath(res)
            with repo.config_writer() as confw:
                confw.set_value("copy-to", "file", res)
            print("Added " + str(res) + " to local git configuration")
@@ -837,7 +867,7 @@ def main():
             print("Name 'group' is reserved to keep track of groupnames")
             raise SystemExit
         elif not args.groupname in conf.envs['group']:
-            print("Look again." + str(args.groupname) + " is not in known groups")
+            print("Look again. " + str(args.groupname) + " is not in known groups")
             listGroups()
             raise SystemExit
         else:
