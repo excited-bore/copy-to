@@ -3,6 +3,7 @@
 import os
 import platform
 import shutil
+import re
 import json
 import sys
 import pathlib
@@ -99,8 +100,55 @@ def is_valid_dir(parser, arg):
             except OSError as e:
                 if e.errno != errno.EEXIST:
                     raise SystemExit
+    
 
-def is_names_or_group(parser, arg):
+def get_sourcepath_subparsers(subparser):
+    set_source_path = subparser.add_parser('set-path-source')
+    set_source_path.add_argument("path", type=lambda x: is_valid_dir(subparser, x) ,help="Source path", metavar="Source path")
+    name_parser = set_source_path.add_subparsers(dest='name')
+    for name, value in conf.envs.items():
+        if not name == 'group':
+            source_parser = name_parser.add_parser(name)
+            last = len(value['src'])
+            def is_src(parser, arg):
+                if re.search("\d-\d", arg):
+                    nums = re.findall(r'\d+', arg)
+                    nums[0] = int(nums[0])
+                    nums[1] = int(nums[1])
+                    if nums[0] > nums[1]:
+                        print("'SourceNumStart', the first sourcenumber needs to be lower then the second sourcenumber 'SourcNumEnd'. See with copy-to list")
+                        raise SystemExit
+                    else:
+                        if nums[0] > last or nums[0] < 1:
+                            print("'SourceNumStart', the first sourcenumber needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
+                            raise SystemExit
+                        elif (nums[1] > last or nums[1] < 1) :
+                            print("'SourceNumEnd', the second sourcenumber needs to be higher then the first sourcenumber and inbetween 1 and " + str(last) + ". See with copy-to list")
+                            raise SystemExit
+                        else:
+                            return str(arg)
+                elif re.search("\d", arg):
+                    nums = re.findall(r'\d+', arg)
+                    nums[0] = int(nums[0])
+                    if nums[0] > last or nums[0] < 1:
+                        print("Sourcenumber needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
+                        raise SystemExit
+                    else:
+                        return str(arg)
+                else:
+                    print("Source must be of format 'SourceNum' or 'SourceNumStart-SourcNumEnd'. See with copy-to list")
+                    raise SystemExit
+                for idx, src in enumerate(value['src']):
+                    numbers.append(str(idx+1))
+            numbers = []
+            if not last == 1:
+                numbers.append('1-' + str(last))
+            for idx, src in enumerate(value['src']):
+                numbers.append(str(idx+1))
+            source_parser.add_argument("src" , nargs='+', type=lambda x: is_src(subparser, x) ,help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers)
+    return set_source_path
+
+def is_names_or_group(parser, arg):                                      
     if arg == 'all':
         listAll()
         return arg
@@ -192,7 +240,7 @@ def get_git_repo_name():
 def git_write_conf(key, value):
     if is_git_repo("./"):
         name = get_git_repo_name()
-        repo = git.Repo(path).git_dir
+        repo = git.Repo(name).git_dir
         with repo.config_writer() as confw: 
             confw.set(key, value)
         print('Added ' + str(key) + ' = ' + str(value) + ' to git settings')
@@ -413,6 +461,11 @@ def get_names_group(group):
         names.append(e)
     return names
 
+def get_source_num(group):
+    names=[]
+    for e in conf.envs['group'][group]:
+        names.append(e)
+    return names
 
 def cpt_run(name):
     if name == ['none']:
@@ -439,7 +492,7 @@ def cpt_run(name):
             if not key in grps:
                 var1.append(key)
         var1 = filterListDoubles(var1)
-        for key in var1:
+        for key in var1:     
             if not key in conf.envs:
                 print("Look again. " + key + " is not known. ")
                 listAllNames()
@@ -550,7 +603,7 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
            print("Added run = none to local git configuration")
         return False
 
-def get_main_parser():
+def main():
     choices = argcomplete.completers.ChoicesCompleter
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
@@ -562,6 +615,7 @@ def get_main_parser():
     add = subparser.add_parser('add')
     delete = subparser.add_parser('delete')
     add_source = subparser.add_parser('add-source')
+    set_source_path = get_sourcepath_subparsers(subparser)
     if distutils.spawn.find_executable("git"):
         set_git = subparser.add_parser('set-git')
     add_group = subparser.add_parser('add-group')
@@ -582,7 +636,10 @@ def get_main_parser():
     add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
     
     delete.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
-    
+   
+    #set_source_path.add("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name", choices=get_reg_names())
+    #set_source_path.add("src_num", nargs='*', type=int, metavar="Source files and directories or Index numbers", help="Source files and directories or Index numbers")
+
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name")
     add_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
@@ -617,9 +674,6 @@ def get_main_parser():
         output_stream = codecs.getwriter("utf-8")(sys.stdout.buffer)
 
     argcomplete.autocomplete(parser, output_stream=output_stream)
-    return parser
-
-def main():
     """
     if platform.system() == 'Linux' or platform.system() == 'Darwin':
         os.popen("eval $(register-python-argcomplete copy-to)").read()
@@ -632,7 +686,6 @@ def main():
 
     sys.path.append(d)"""
     
-    parser = get_main_parser()
     args = parser.parse_args()
 
     name= args.name if "name" in args else ""
@@ -777,6 +830,19 @@ def main():
             if args.list:
                 listName(name)
             print(str(args.name) + ' added to configuration file')
+    elif args.command == 'set-path-source':
+        names = get_reg_names()
+        nameFound=False
+        for name in names:
+            if args.name == name:
+                nameFound = True
+                for i in args.src:
+                    print(i)
+                    #os.path.basename(conf.envs[str(args.name)]['src'])
+        if not nameFound:
+            set_source_path.print_help()
+            print("'set-path-source' needs a new path, a configuration name and a source range/number")
+            raise SystemExit
 
     elif args.command == 'add-group':
         if not 'groupname' in args:
@@ -902,8 +968,6 @@ def main():
                 if not args.name == []:
                     print("Look again. " + str(args.name) + " isn't/aren't in " + str(args.groupname))
                     raise SystemExit
-                
-
     elif args.command == 'add-source':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
