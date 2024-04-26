@@ -101,51 +101,62 @@ def is_valid_dir(parser, arg):
                 if e.errno != errno.EEXIST:
                     raise SystemExit
     
-
 def get_sourcepath_subparsers(subparser):
     set_source_path = subparser.add_parser('set-path-source')
-    set_source_path.add_argument("path", type=lambda x: is_valid_dir(subparser, x) ,help="Source path", metavar="Source path")
     name_parser = set_source_path.add_subparsers(dest='name')
+    def is_src(parser, name1, value1, arg):
+        last = len(value1['src'])
+        if re.search("\d-\d", arg):
+            nums = re.findall(r'\d+', arg)
+            nums[0] = int(nums[0])
+            nums[1] = int(nums[1])
+            if nums[0] < 1 or nums[0] > last:
+                print("'SourceNumStart', the first sourcenumber needs to more then 1 and lower then " + last + ". See with copy-to list")
+                raise SystemExit 
+            elif nums[1] < 1 or nums[1] > last:
+                print("'SourceNumEnd', the first sourcenumber needs to more then 1 and lower then " + last + ". See with copy-to list")
+                raise SystemExit
+            elif nums[0] > nums[1]:
+                print("'SourceNumStart', the first sourcenumber needs to be lower then the second sourcenumber 'SourcNumEnd'. See with copy-to list")
+                raise SystemExit
+            else:
+                if nums[0] > last or nums[0] < 1:
+                    print("'SourceNumStart', the first sourcenumber needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
+                    raise SystemExit
+                elif (nums[1] < nums[0] or nums[1] < 1):
+                    print("'SourceNumEnd', the second sourcenumber needs to be higher then the first sourcenumber and inbetween 1 and " + str(last) + ". See with copy-to list")
+                    raise SystemExit
+                else:
+                    return str(arg)
+        elif re.search("\d", arg):
+            nums = re.findall(r'\d+', arg)
+            nums[0] = int(nums[0])
+            if nums[0] > last or nums[0] < 1:
+                print("Sourcenumber for " + name1 + " needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
+                raise SystemExit
+            else:
+                return str(arg)
+        else:
+            print("Source must be of format 'SourceNum' or 'SourceNumStart-SourcNumEnd'. See with copy-to list")
+            raise SystemExit
     for name, value in conf.envs.items():
         if not name == 'group':
             source_parser = name_parser.add_parser(name)
             last = len(value['src'])
-            def is_src(parser, arg):
-                if re.search("\d-\d", arg):
-                    nums = re.findall(r'\d+', arg)
-                    nums[0] = int(nums[0])
-                    nums[1] = int(nums[1])
-                    if nums[0] > nums[1]:
-                        print("'SourceNumStart', the first sourcenumber needs to be lower then the second sourcenumber 'SourcNumEnd'. See with copy-to list")
-                        raise SystemExit
-                    else:
-                        if nums[0] > last or nums[0] < 1:
-                            print("'SourceNumStart', the first sourcenumber needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
-                            raise SystemExit
-                        elif (nums[1] > last or nums[1] < 1) :
-                            print("'SourceNumEnd', the second sourcenumber needs to be higher then the first sourcenumber and inbetween 1 and " + str(last) + ". See with copy-to list")
-                            raise SystemExit
-                        else:
-                            return str(arg)
-                elif re.search("\d", arg):
-                    nums = re.findall(r'\d+', arg)
-                    nums[0] = int(nums[0])
-                    if nums[0] > last or nums[0] < 1:
-                        print("Sourcenumber needs to be inbetween 1 and " + str(last) + ". See with copy-to list")
-                        raise SystemExit
-                    else:
-                        return str(arg)
-                else:
-                    print("Source must be of format 'SourceNum' or 'SourceNumStart-SourcNumEnd'. See with copy-to list")
-                    raise SystemExit
-                for idx, src in enumerate(value['src']):
-                    numbers.append(str(idx+1))
             numbers = []
-            if not last == 1:
-                numbers.append('1-' + str(last))
             for idx, src in enumerate(value['src']):
                 numbers.append(str(idx+1))
-            source_parser.add_argument("src" , nargs='+', type=lambda x: is_src(subparser, x) ,help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers)
+            i=1
+            j=1
+            for e in value['src']:
+                for r in value['src']:
+                    if i < j:
+                        numbers.append(str(i) + '-' + str(j))
+                    j+=1
+                i+=1
+                j=1
+            source_parser.add_argument("path", type=lambda x: is_valid_dir(subparser, x) ,help="Source path", metavar="Source path")
+            source_parser.add_argument("src" , nargs='+', type=lambda x: is_src(subparser, name, value, x) ,help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers)
     return set_source_path
 
 def is_names_or_group(parser, arg):                                      
@@ -837,8 +848,12 @@ def main():
             if args.name == name:
                 nameFound = True
                 for i in args.src:
-                    print(i)
-                    #os.path.basename(conf.envs[str(args.name)]['src'])
+                    item = os.path.basename(conf.envs[str(args.name)]['src'][int(i)-1])
+                    print(item)
+                    if args.path[-1] != '/':
+                        args.path = args.path + '/'
+                    conf.envs[str(args.name)]['src'][int(i)-1] = args.path + item
+                    
         if not nameFound:
             set_source_path.print_help()
             print("'set-path-source' needs a new path, a configuration name and a source range/number")
