@@ -252,6 +252,11 @@ copy-to reset-source myname
 copy-to reset-destination myname newDest
 ```  
 
+Set the path of source files/folders by index with  
+```
+copy-to set-source-path myname1 /home/user/ 1 2-4  
+```  
+
 Groups are based on names. For copying to multiple directories in one go.  
 Groupnames 'group'/'all' cannot be used.  
 
