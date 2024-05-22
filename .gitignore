@@ -3,4 +3,7 @@ copy_to.egg-info/
 __pycache__/
 dist/
 wheels/
-copy-to-venv/
+venv/
+tags/
+PKG-INFO/
+setup.cfg/
