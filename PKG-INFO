@@ -1,3 +1,21 @@
+Metadata-Version: 2.1
+Name: copy-to
+Version: 1.3.39
+Summary: A little commandline tool to copy and paste multiple files and directories to single directory with use of configuration
+Author-email: Stan Nys <stan96@duck.com>
+Project-URL: Homepage, https://github.com/excited-bore/copy-to
+Project-URL: Bug Tracker, https://github.com/excited-bore/copy-to/issues
+Keywords: copy-to,setuptools,development
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: argcomplete>=3.2.1
+Requires-Dist: GitPython>=3.1.14
+Requires-Dist: prompt_toolkit>=3.0.20
+
 ## Copy-to
 
 A little python script I use in conjunction with git so you can easily copy (config) files located outside of a git repository to one (or to wherever you want to). Useful for configuration files.  
@@ -206,16 +224,9 @@ Then if everything went well, we can just push to our remote repository using `g
 We can keep this up-to-date regularly by running `copy-to run firefox`, `cd C:/Users/username/dotfiles` and `git push` whenever we make changes.  
 
 Now, if we ever need to freshly install firefox, we have a backup ready to go that we can use by running `copy-to run-reverse`.  
-Or, if we ever decide to use a different operating system, we clone our repository after installing firefox and relocate the firefox profile folder.  
-If we made a private repository we use:
+Or, if we ever decide to use a different operating system, we clone our repository after installing firefox and relocate the firefox profile folder. Then we run:  
 ```
-git clone git@github.com:<username>/dotfiles  
-```  
-because otherwise we run into authentication problems.  
-
-Then we run:  
-```
-copy-to set-git file confs.json
+copy-to set-file file confs.json
 copy-to reset-destination firefox "new-profile-folder"  
 copy-to run-reverse firefox
 ```  

@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 copy_to.egg-info/
 __pycache__/
+tags
 dist/
 wheels/
 venv/

@@ -3,7 +3,7 @@ requires = ["setuptools","argcomplete", "GitPython", "prompt_toolkit"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "copy-to"
-version = "1.3.42"
+version = "1.3.49"
 authors = [
   { name="Stan Nys", email="stan96@duck.com" },
 ]

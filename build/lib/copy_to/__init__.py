@@ -484,22 +484,18 @@ def get_group_subparsers(subparser):
     delete_from_group = subparser.add_parser('delete-from-group')
     add_group_parser = add_to_group.add_subparsers(dest='group')
     delete_group_parser = delete_from_group.add_subparsers(dest='group')
-    names_add = {}
-    names_del = {}
+    names = {}
     for name, value in conf.envs.items():
         if name == 'group':
+            add_parser = add_group_parser.add_parser(name)
+            delete_parser = delete_group_parser.add_parser(name)
+            names[name]=[]
             for i in value:
-                add_parser = add_group_parser.add_parser(i)
-                delete_parser = delete_group_parser.add_parser(i)
-                names_add[i]=[]
-                names_del[i]=[]
                 for e in get_reg_names():
                     if not e in conf.envs['group'][i]:
-                        names_add[i].append(e)
-                    elif e in conf.envs['group'][i]:
-                        names_del[i].append(e)
-                add_parser.add_argument("name" , nargs='+', help="Group name holding multiple configuration names", metavar="Group name", choices=names_add[i])
-                delete_parser.add_argument("name" , nargs='+', help="Configuration name", metavar="Configuration name(s)", choices=names_del[i])
+                        names[name].append(e)
+            add_parser.add_argument("src" , nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=names[name])
+            delete_parser.add_argument("src" , nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=names[name])
     return add_to_group,delete_from_group
 
 
@@ -652,7 +648,7 @@ def main():
     delete = subparser.add_parser('delete')
     add_source = subparser.add_parser('add-source')
     set_source_path = get_sourcepath_subparsers(subparser)
-    add_to_group, delete_from_group = get_group_subparsers(subparser)
+    add_to_group,delete_from_group = get_group_subparsers(subparser)
     if shutil.which("git"):
         set_git = subparser.add_parser('set-git')
     add_group = subparser.add_parser('add-group')
@@ -680,11 +676,11 @@ def main():
 
     delete_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
     
-    #add_to_group.add_argument("groupname", type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    #add_to_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    add_to_group.add_argument("groupname", type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    add_to_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
-    #delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    #delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
+    delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
     
     if shutil.which("git"):
         git_command = set_git.add_subparsers(dest='gitcommand')
@@ -943,29 +939,29 @@ def main():
                 json.dump(conf.envs, outfile)
 
     elif args.command == 'add-to-group':
-        if not 'group' in args:
+        if not 'groupname' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
-        elif not args.group in conf.envs['group']:
-            print(str(args.group) + ". Doesn't exist. Look again.")
+        elif not args.groupname in conf.envs['group']:
+            print(str(args.groupname) + ". Doesn't exist. Look again.")
             listGroupNames()
             raise SystemExit
         else:
             groupnames = []
-            groupnames = conf.envs['group'][args.group]
-            for known in groupnames:
-                for n in args.group:
-                    if known == n:
-                        print("Look again. " + known + " is already in " + args.group)
-                        listAllGroups()
-                        raise SystemExit
             with open(conf.file, 'w') as outfile: 
+                groupnames = conf.envs['group'][args.groupname]
+                for known in groupnames:
+                    for n in args.name:
+                        if known == n:
+                            print("Look again. " + known + " is already in " + args.groupname)
+                            listAllGroups()
+                            raise SystemExit
                 for key in name:
-                    conf.envs['group'][args.group].append(key)
+                    conf.envs['group'][args.groupname].append(key)
                 json.dump(conf.envs, outfile)
             if args.list:
-                listName(args.group)
-            print(str(args.name) + ' added to ' + str(args.group))
+                    listName(args.groupname)
+            print(str(args.name) + ' added to ' + str(args.groupname))
 
     elif args.command == 'delete':
         if not 'name' in args:
@@ -1011,29 +1007,29 @@ def main():
                 json.dump(conf.envs, outfile)
     
     elif args.command == 'delete-from-group':
-        if not 'group' in args:
+        if not 'groupname' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
-        elif not args.group in conf.envs['group']:
-            print(str(args.group) + ". Doesn't exist. Look again.")
+        elif not args.groupname in conf.envs['group']:
+            print(str(args.groupname) + ". Doesn't exist. Look again.")
             listGroupNames()
             raise SystemExit
         else:
-            group = []
-            groupnames = conf.envs['group'][args.group]
-            for known in conf.envs['group'][args.group]:
-                for n in args.name:
-                    if known == n:
-                        with open(conf.file, 'w') as outfile: 
-                            conf.envs['group'][args.group].remove(known)
-                            json.dump(conf.envs, outfile)
-                        args.name.remove(n)
-                        if args.list:
-                            listName(args.group) 
-                        print(str(n) + ' removed from ' + str(args.group))
-            if not args.name == []:
-                print("Look again. " + str(args.name) + " isn't/aren't in " + str(args.group))
-                raise SystemExit
+            groupnames = []
+            with open(conf.file, 'w') as outfile: 
+                groupnames = conf.envs['group'][args.groupname]
+                for known in groupnames:
+                    for n in args.name:
+                        if known == n:
+                            conf.envs['group'][args.groupname].remove(known)
+                            args.name.remove(n)
+                            if args.list:
+                                listName(args.groupname) 
+                            print(str(n) + ' removed from ' + str(args.groupname))
+                json.dump(conf.envs, outfile)
+                if not args.name == []:
+                    print("Look again. " + str(args.name) + " isn't/aren't in " + str(args.groupname))
+                    raise SystemExit
     elif args.command == 'add-source':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
