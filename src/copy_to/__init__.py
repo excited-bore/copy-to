@@ -623,6 +623,7 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         res_path = pathlib.Path(res)
         if git_path in res_path.parents:
             res = str(res_path.relative_to(os.path.dirname(git.Repo("./", search_parent_directories=True).git_dir)))
+            res = os.path.realpath(res)
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "file", res)
         print("Added file = " + str(res) + " to local git configuration")
@@ -802,7 +803,6 @@ def main():
     elif args.command == 'set-git':
         if not args.gitcommand:
             args.gitcommand = prompt("Give up a git value to set (run/file): ", pre_run=prompt_autocomplete, completer=WordCompleter(["run", "file"]))
-            
         if args.gitcommand == 'run':
            repo = git.Repo("./", search_parent_directories=True)
            res = "all"
@@ -852,7 +852,7 @@ def main():
            res_path = pathlib.Path(res)
            if git_path in res_path.parents:
                res = str(res_path.relative_to(os.path.dirname(git.Repo("./", search_parent_directories=True).git_dir)))
-               #res = os.path.relpath(res)
+               res = os.path.realpath(res)
            with repo.config_writer() as confw:
                confw.set_value("copy-to", "file", res)
            print("Added " + str(res) + " to local git configuration")
