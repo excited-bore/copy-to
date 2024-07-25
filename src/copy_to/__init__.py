@@ -278,6 +278,16 @@ def copy_to(dest, src):
             else:
                 raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if os.path.isfile(exist_dest):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    reslt = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+
+            if reslt == "no":
+                continue
         if os.path.isfile(element):
             shutil.copy2(element, exist_dest)
             print("Copied to " + str(exist_dest))
@@ -295,6 +305,16 @@ def copy_from(dest, src):
             else:
                 raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if os.path.isfile(exist_dest):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    reslt = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+
+            if reslt == "no":
+                continue
         if os.path.isfile(exist_dest):
             shutil.copy2(exist_dest, element)
             print("Copied to " + str(element))
@@ -631,6 +651,10 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "run", res)
         print("Added run = " + str(res) + " to local git configuration")
+        res = prompt("Overwrite existing files?: (prevents prompt - yes / no): ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+        with repo.config_writer() as confw:
+            confw.set_value("copy-to", "overwrite", res)
+        print("Added overwrite = " + str(res) + " to local git configuration")
         return res
     else:
         res1 = prompt("You selected no. Prevent this popup from coming up again? [y/n]:", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
@@ -693,6 +717,9 @@ def main():
         git_run.add_argument("value" , nargs='?' ,type=str , help="Configuration name", metavar="Configuration name", choices=get_names(True))
         git_file = git_command.add_parser('file')
         git_file.add_argument("value" , nargs='?' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
+        git_overwrite = git_command.add_parser('overwrite')
+        git_overwrite.add_argument("value" , nargs='?' ,type=str , help="Overwrite files?", metavar="Configuration file", choices=['yes','no'])
+        
     
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
     add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
@@ -802,7 +829,8 @@ def main():
                 listName(name)
     elif args.command == 'set-git':
         if not args.gitcommand:
-            args.gitcommand = prompt("Give up a git value to set (run/file): ", pre_run=prompt_autocomplete, completer=WordCompleter(["run", "file"]))
+            args.gitcommand = prompt("Give up a git value to set (run/file/overwrite): ", pre_run=prompt_autocomplete, completer=WordCompleter(["run", "file", 'overwrite']))
+
         if args.gitcommand == 'run':
            repo = git.Repo("./", search_parent_directories=True)
            res = "all"
@@ -856,7 +884,10 @@ def main():
            with repo.config_writer() as confw:
                confw.set_value("copy-to", "file", res)
            print("Added " + str(res) + " to local git configuration")
-        
+        elif args.gitcommand == 'overwrite':
+           repo = git.Repo("./", search_parent_directories=True)
+           with repo.config_writer() as confw:
+               confw.set_value("copy-to", "overwrite", args.value)
 
     elif args.command == 'add':
         if not 'name' in args:
