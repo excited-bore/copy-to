@@ -286,8 +286,8 @@ def copy_to(dest, src):
                 except:
                     reslt = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
 
-            if reslt == "no":
-                continue
+                if reslt == "no":
+                    continue
         if os.path.isfile(element):
             shutil.copy2(element, exist_dest)
             print("Copied to " + str(exist_dest))
@@ -313,8 +313,8 @@ def copy_from(dest, src):
                 except:
                     reslt = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
 
-            if reslt == "no":
-                continue
+                if reslt == "no":
+                    continue
         if os.path.isfile(exist_dest):
             shutil.copy2(exist_dest, element)
             print("Copied to " + str(element))
