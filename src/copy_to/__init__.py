@@ -16,6 +16,7 @@ from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.application.current import get_app
 from pathlib import Path
 import subprocess
+import filecmp
 if shutil.which("git"):
    import git
    from git import Repo
@@ -289,8 +290,12 @@ def copy_to(dest, src):
                 if reslt == "no":
                     continue
         if os.path.isfile(element):
-            shutil.copy2(element, exist_dest)
-            print("Copied to " + str(exist_dest))
+            if os.path.isfile(exist_dest) and filecmp.cmp(exist_dest, element):
+                print("Skipped " + str(element) + " since " + str(exist_dest) + " is the same file")
+                continue
+            else: 
+                shutil.copy2(element, exist_dest)
+                print("Copied to " + str(exist_dest))
 
         elif os.path.isdir(element):
             shutil.copytree(element, exist_dest, dirs_exist_ok=True)
