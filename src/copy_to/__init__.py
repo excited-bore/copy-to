@@ -1152,7 +1152,7 @@ def main():
                         print("One of the given numbers exceeds the amount of sources for " + str(args.name))
                         raise SystemExit
                     src = conf.envs[name]['src']
-                    for j in range(int(nums[0]),int(nums[1])+1):
+                    for j in reversed(range(int(nums[0]),int(nums[1])+1)):
                         name_src = src[int(j)-1]
                         src.pop(int(j) - 1)
                         print('Deleted source of '+ str(name) + " " + str(j) + ' - ' + str(name_src))
