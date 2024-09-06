@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 name = "copy-to"
 version = "1.4.4"
 authors = [
-  { name="Stan Nys", email="stan96@duck.com" },
+  { name="Excited Bore", email="brunt-curry-wobble@duck.com" },
 ]
 
 keywords = ["copy-to", "setuptools", "development"]
