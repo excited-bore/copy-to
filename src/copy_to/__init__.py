@@ -662,7 +662,7 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         print("Added overwrite = " + str(res) + " to local git configuration")
         return res
     else:
-        res1 = prompt("You selected no. Prevent this popup from coming up again? [y/n]:", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+        res1 = prompt("You selected no. Prevent this popup from coming up again? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
         if res1 == 'y':
            with repo.config_writer() as confw:
                 confw.set_value("copy-to", "run", "none")
