@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
+
+import importlib.metadata
+__version__ = importlib.metadata.version("copy-to")
+
 import os
 import platform
 import shutil
@@ -674,6 +678,8 @@ def main():
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
     parser.add_argument("-f","--file", type=lambda x: is_valid_conf(parser, x), required=False, help="Configuration file", metavar="Configuration file", default=conf.file)
+    parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__)) 
+     
     subparser = parser.add_subparsers(dest='command')
     list1 = subparser.add_parser('list')
     run = subparser.add_parser('run')
