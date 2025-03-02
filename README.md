@@ -24,7 +24,7 @@ python -m pipx install copy-to
 
 Then, restart you shell.  
 
-For autocompletion on Windows Powershell v5.1, first run:  
+For autocompletion on Windows Powershell v5.1, first run (to enable run files as scripts, not permanent):  
 ```
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted
 ```  
