@@ -37,11 +37,14 @@ echo "Set-Alias -Name copy-to -Value copy-to.exe"$Comp >$HOME\Documents\WindowsP
 ```
 
 Then check your Profile folder using `echo $PSHOME`, and (using for example notepad) open a file in that path called `Profile.ps1`. This requires administrator access.   
-For powershell v5.1, this is `C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1`. Open notepad as an administrator and create the file if it doesn't exist yet.  
-Then in that file, put this:  
+For **powershell 5.1**, $PSHOME is `C:\Windows\System32\WindowsPowerShell\v1.0` at default 
+For **powershell 7**, $PSHOME is `C:\Program Files\PowerShell\7` at default
+So for autocompletion in powershell 5.1, make the file `C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1` 
+and edit that as an administrator (using notepad f.ex.) with:  
 ```
 Import-Module $HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
-```  
+```
+You could also open up a powershell 5.1 prompt as an admin and type `notepad.exe $PSHOME\Profile.ps1`   
 
 For Linux / MacOs, try running it once if autocompletions aren't working  
 
