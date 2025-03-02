@@ -32,7 +32,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted
 Then, for Powershell autocompletion in general, run:  
 ```
 mkdir -p $HOME\Documents\WindowsPowerShell\Modules
-python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe > $HOME\Documents\WindowsPowerShell\Modules/copy-to.psm1
+python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe > $HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
 ```
 
 Then check your Profile folder using `echo $PSHOME`, and (using for example notepad) open a file in that path called `Profile.ps1`. This requires administrator access.   
