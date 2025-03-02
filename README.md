@@ -32,7 +32,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted
 Then, for Powershell autocompletion in general, run:  
 ```
 mkdir -p $HOME\Documents\WindowsPowerShell\Modules
-$Comp = (python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe) -replace 'copy-to.exe','copy-to.exe,copy-to'
+$Comp = (python ((where.exe register-python-argcomplete).Split([Environment]::NewLine) | Select -First 1) --shell powershell copy-to.exe) -replace '-CommandName copy-to.exe','-CommandName copy-to.exe,copy-to'
 echo "Set-Alias -Name copy-to -Value copy-to.exe"$Comp >$HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
 ```
 
