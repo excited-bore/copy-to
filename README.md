@@ -39,7 +39,7 @@ Then check your Profile folder using `echo $PSHOME`, and (using for example note
 For powershell v5.1, this is `C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1`. Open notepad as an administrator and create the file if it doesn't exist yet.  
 Then in that file, put this:  
 ```
-Import-Module $HOME\Documents\WindowsPowerShell\Modules/copy-to.psm1
+Import-Module $HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
 ```  
 
 For Linux / MacOs, try running it once if autocompletions aren't working  
