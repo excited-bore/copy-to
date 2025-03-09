@@ -51,7 +51,7 @@ You are allowed to softlink both system-wide powershell profiles with (in this e
 cmd /c mklink C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1 C:\Program Files\PowerShell\7\Profile.ps1
 ``` 
 
-You could also save user-specific aliases by putting these lines your default user profile.ps1 file. These won't be accessible as an admin, but will be sourced after sourcing the systemwide profiles (will overwrite). 
+You could also save user-specific aliases by putting these lines your default user profile.ps1 file. These won't be accessible as an admin, but will be sourced after sourcing the systemwide profiles (will overwrite).  
 For that, edit this file with `notepad.exe C:\Users\$Env:UserName\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1`     
 
 For Linux / MacOs, try running it once if autocompletions aren't working  
