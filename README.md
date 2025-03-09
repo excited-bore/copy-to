@@ -36,15 +36,23 @@ $Comp = (python ((where.exe register-python-argcomplete).Split([Environment]::Ne
 echo "Set-Alias -Name copy-to -Value copy-to.exe"$Comp > $HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
 ```
 
-Then check your Profile folder using `echo $PSHOME`, and (using for example notepad) open a file in that path called `Profile.ps1`. This requires administrator access.   
+If you want user-wide access to copy-to aliases (and possibly other aliases), you need to configure the user-wide powershell profiles for each version of powershell.  
+Check these Profile folders using `echo $PSHOME` for each version of powershell you're using and then (using f.ex. notepad as an editor), open a file in that path called `Profile.ps1` using admin rights (so open up a admin shell before hand or install sudo using `winget install gerardog.gsudo` and run `sudo notepad.exe $PSHOME/Profile.ps1`)   
 For **powershell 5.1**, $PSHOME is `C:\Windows\System32\WindowsPowerShell\v1.0` at default  
 For **powershell 7**, $PSHOME is `C:\Program Files\PowerShell\7` at default  
-So for autocompletion in powershell 5.1, make the file `C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1` if it doesn't exist yet 
-and edit that as an administrator (using notepad f.ex.) with:  
-```
+So for autocompletion in powershell 5.1, make the file `C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1` if it doesn't exist yet.
+and edit that file as an administrator with:  
+```pwsh
 Import-Module $HOME\Documents\WindowsPowerShell\Modules\copy-to.psm1
 ```
-You could also open up a powershell 5.1 prompt as an admin and type `notepad.exe $PSHOME\Profile.ps1`   
+You are allowed to softlink both system-wide powershell profiles with (in this example link the file from pwshv5.1 to pwshv7) as an admin with:  
+
+```pwsh
+cmd /c mklink C:\Windows\System32\WindowsPowerShell\v1.0\Profile.ps1 C:\Program Files\PowerShell\7\Profile.ps1
+``` 
+
+You could also save user-specific aliases by putting these lines your default user profile.ps1 file. These won't be accessible as an admin, but will be sourced after sourcing the systemwide profiles (will overwrite). 
+For that, edit this file with `notepad.exe C:\Users\$Env:UserName\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1`     
 
 For Linux / MacOs, try running it once if autocompletions aren't working  
 
