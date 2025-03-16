@@ -92,18 +92,6 @@ Linux bash (put in your .bashrc - `nano ~/.bashrc`):
 alias git-status="copy-to run && git status"
 ```  
 
-or for those who use it, on startup of [Lazygit](https://github.com/jesseduffield/lazygit):  
-
-Windows Powershell:  
-```
-function lazygit { copy-to.exe run && lazygit.exe }
-```  
-
-Linux bash:  
-```
-alias lazygit="copy-to run && lazygit"
-```  
-
 Local git config:  
 ```
 [copy-to]  
@@ -156,11 +144,11 @@ Then we add everything in the firefox 'profile' folder programmatically using co
     - Then we run `copy-to add firefox firefox ` to add a the target folder but without the source files. This will also create a subfolder `firefox` in our git repository wich will be our destination.  
 
 We can handpick what parts of our firefox config we want to backup, for example to keep only our bookmarks, we could store <em>places.sqlite</em>, <em>bookmarksbackups/</em> and <em>favicons.sqlite</em> (See [this](https://support.mozilla.org/en-US/kb/profiles-where-firefox-stores-user-data)) from  
-`"C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\"`.  
+`"C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\"`.  
 Don't forget to *close* firefox <em>first</em> and change this folder to *your* <em>profile folder</em> and/or <em>username</em>.  
 
 ```
-copy-to add-source firefox "C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\places.sqlite" "C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\bookmarksbackups/" "C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\favicons.sqlite"
+copy-to add-source firefox "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\places.sqlite" "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\bookmarksbackups/" "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\favicons.sqlite"
 ```  
 
 Folders added to source will automatically copy recursively.  
@@ -168,8 +156,8 @@ Folders added to source will automatically copy recursively.
 On the other hand, we could also iterate over each file in our profile folder (dont forget to replace the path with the path you copied earlier):  
 
 ```
-Get-ChildItem "C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release" -Filter * |  
-ForEach-Object {copy-to add-source firefox "C:\Users\username\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\$_" }
+Get-ChildItem "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release" -Filter * |  
+ForEach-Object {copy-to add-source firefox "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles\random_release\$_" }
 ```  
 
 For Linux (and presumably MacOs), this would be:
@@ -187,7 +175,7 @@ Now that everything we want related to firefox is inside our local git repositor
 ![Setup git_ssh](https://raw.githubusercontent.com/excited-bore/copy-to/main/images/Setup_git_ssh.gif "Setup git ssh")  
 
 Following the instructions on [Github](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent):  
-    - We create a public/private keypair using `ssh-keygen -t ed25519`. This will save our keypair inside `C:\Users\username\.ssh\id_ed25519` and `C:\Users\username\.ssh\id_ed25519.pub` respectively.  
+    - We create a public/private keypair using `ssh-keygen -t ed25519`. This will save our keypair inside `C:\Users\$env:USERNAME\.ssh\id_ed25519` and `C:\Users\$env:USERNAME\.ssh\id_ed25519.pub` respectively.  
     - Then we open up an administrator powershell and run:  
 
 ```
@@ -197,7 +185,7 @@ Start-Service ssh-agent
 
 to startup the ssh-agent.  
     - Back inside a regular powershell, we add our private key using  
-    `ssh-add C:\Users\username\.ssh\id_ed25519`.  
+    `ssh-add C:\Users\$env:USERNAME\.ssh\id_ed25519`.  
     - Then we add the ssh key to our github account and test our connecting using `ssh -T git@github.com`.  
 
 ### Setup remote repository
@@ -212,10 +200,10 @@ git commit -m "Initial commit"
 ```  
 
 Next we got to our github account and create a new private repository.  
-After that, we configure the remote repository using `git remote add origin git@github.com/username/dotfiles.git`.  
+After that, we configure the remote repository using `git remote add origin git@github.com/$env:USERNAME/dotfiles.git`.  
 Then if everything went well, we can just push to our remote repository using `git push -u origin main`.  
 
-We can keep this up-to-date regularly by running `copy-to run firefox`, `cd C:/Users/username/dotfiles` and `git push` whenever we make changes.  
+We can keep this up-to-date regularly by running `copy-to run firefox`, `cd C:/Users/$env:USERNAME/dotfiles` and `git push` whenever we make changes.  
 
 Now, if we ever need to freshly install firefox, we have a backup ready to go that we can use by running `copy-to run-reverse`.  
 Or, if we ever decide to use a different operating system, we clone our repository after installing firefox and relocate the firefox profile folder.  
@@ -250,9 +238,9 @@ copy-to --list othercommand
 You can also use 'all' to list/run all known configurations  
 
 
-Delete set of dest/src by name with  
+Remove set of dest/src by name with  
 ```
-copy-to delete myname1 (myname2)
+copy-to remove myname1 (myname2)
 ```  
 
 Add sources with  
@@ -260,9 +248,9 @@ Add sources with
 copy-to add-source myname folder1 file1
 ```  
 
-Delete source by index with  
+Remove source by index with  
 ```
-copy-to delete-source myname 1 4 7
+copy-to remove-source myname 1 4 7
 ```  
 
 Reset source and destination folders  
@@ -273,7 +261,7 @@ copy-to reset-destination myname newDest
 
 Set the path of source files/folders by index with  
 ```
-copy-to set-source-path myname1 /home/user/ 1 2-4  
+copy-to set-path-source myname1 /home/user/ 1 2-4  
 ```  
 
 Groups are based on names. For copying to multiple directories in one go.  
@@ -284,9 +272,9 @@ Add groupname
 copy-to add-group mygroupname myname1 myname2
 ```  
 
-Delete groupname
+Remove groupname
 ```
-copy-to delete-group mygroupname
+copy-to remove-group mygroupname
 ```  
 
 Add name to group  
@@ -294,9 +282,9 @@ Add name to group
 copy-to add-to-group mygroupname myname1 myname2
 ```  
 
-Delete name from group  
+Remove name from group  
 ```
-copy-to delete-from-group mygroupname myname1 myname2
+copy-to remove-from-group mygroupname myname1 myname2
 ```  
 
 At default the configuration file is located at `~/.config/copy-to/confs.json`, but you can set a environment variable `COPY_TO` to change this, or pass a `-f, --file` flag.  

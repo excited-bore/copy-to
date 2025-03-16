@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
+
+import importlib.metadata
+__version__ = importlib.metadata.version("copy-to")
+
 import os
 import platform
 import shutil
@@ -16,6 +20,7 @@ from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.application.current import get_app
 from pathlib import Path
 import subprocess
+import filecmp
 if shutil.which("git"):
    import git
    from git import Repo
@@ -83,22 +88,10 @@ if is_git_repo("./"):
     except:
         pass
 
-def is_valid_dir(parser, arg):
-    if os.path.isdir(arg):
-        return os.path.abspath(arg)
-    elif os.path.isfile(arg):
-        print('%s is a file. A folder is required' % arg)
-        raise SystemExit              
-    else:
-        print("The directory %s does not exist!" % arg)
-        res = prompt("Do you want to create the directory " + arg + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
-        if res == "y":
-            try:
-                os.makedirs(arg)
-                return os.path.abspath(arg)
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise SystemExit
+def is_valid_dir(arg):
+    if not pathlib.Path(arg).is_dir():
+        raise NotADirectoryError(arg)
+    return pathlib.Path.absolute(arg)
 
 def is_src(parser, name1, value1, arg):
     last = len(value1['src'])
@@ -156,8 +149,8 @@ def get_sourcepath_subparsers(subparser):
                     j+=1
                 i+=1
                 j=1
-            source_parser.add_argument("path", type=lambda x: is_valid_dir(subparser, x) ,help="Source path", metavar="Source path")
-            source_parser.add_argument("src" , nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers[name])
+            source_parser.add_argument("path", type=pathlib.Path, default=os.path.curdir, help="Source path", metavar="Source path")
+            source_parser.add_argument("src" , type=int, nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers[name])
     return set_source_path
 
 def is_names_or_group(parser, arg):                                      
@@ -257,59 +250,228 @@ def git_write_conf(key, value):
             confw.set(key, value)
         print('Added ' + str(key) + ' = ' + str(value) + ' to git settings')
 
-def is_valid_file_or_dir(parser, arg):
-    arg=os.path.abspath(arg)
-    if os.path.isdir(arg):
-        return arg
-    elif os.path.isfile(arg):
-        return arg              
-    elif os.path.exists(os.path.join(os.getcwd(), arg)):
-        return os.path.join(os.getcwd(), arg)
-    else:
-        print("The file/directory %s does not exist!" % arg)
-        raise SystemExit
+#def is_valid_file_or_dir(parser, arg):
+#    arg=os.path.abspath(arg)
+#    if os.path.isdir(arg):
+#        return arg
+#    elif os.path.isfile(arg):
+#        return arg              
+#    elif os.path.exists(os.path.join(os.getcwd(), arg)):
+#        return os.path.join(os.getcwd(), arg)
+#    else:
+#        raise FileNotFoundError("The file/directory %s does not exist!" % arg)
 
-def copy_to(dest, src):
+def copy_to_dest(dest, src):
     for element in src:
         if not os.path.exists(dest):
-            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [yes/no]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
             if res == "y":
                 os.makedirs(dest)
             else:
                 raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
-        if os.path.isfile(exist_dest):
-            res = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
-            if res == "n":
-                continue
-        if os.path.isfile(element):
+
+        if os.path.exists(exist_dest):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    if os.path.isfile(exist_dest) and shutil.which("git"):
+                        reslt = prompt("There's already a file in the destination: " + exist_dest + ". What to do with it? [diff/overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["diff", "overwrite", "exit"]))
+                    else:
+                        reslt = prompt("There's already a file/folder in the destination: " + exist_dest + ". What to do with it? [overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["overwrite", "exit"]))
+                if reslt == 'diff':
+                    subprocess.run(["git", "diff", element, exist_dest]) 
+                    reslt = prompt("What to do with " + exist_dest + "? [overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["overwrite", "exit"]))
+
+                if reslt == "exit":
+                    raise SystemExit
+                elif reslt == 'overwrite':
+                    if os.path.isfile(exist_dest):
+                        pathlib.Path.unlink(exist_dest)
+                    elif os.path.isdir(exist_dest) and os.listdir(exist_dest) == 0:
+                        pathlib.Path.rmdir(exist_dest)
+                    elif os.path.isdir(exist_dest):
+                        print(exist_dest + ": ")
+                        for i in os.listdir(exist_dest):
+                            print(" -" + str(pathlib.Path(i).absolute()))
+                        reslt = prompt(exist_dest + " is not empty. Are you sure you want to remove the entire directory? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+                        if reslt == 'yes':
+                            shutil.rmtree(exist_dest)
+                        else:
+                            raise SystemExit
+                    print(exist_dest + " removed")
+        print('blh')           
+        if os.path.isfile(element): 
             shutil.copy2(element, exist_dest)
             print("Copied to " + str(exist_dest))
-
         elif os.path.isdir(element):
             shutil.copytree(element, exist_dest, dirs_exist_ok=True)
             print("Copied to " + str(exist_dest) + " and all it's inner content")
 
-def copy_from(dest, src):
+def copy_from_dest(dest, src, overwrite=False):
+    for element in src:
+        exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if not os.path.exists(exist_dest):
+            reslt = prompt(exist_dest + " doesn't exist. Skip? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+            if reslt == 'yes':
+                continue
+            else:
+                raise SystemExit
+        
+        exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if os.path.exists(exist_dest):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    if os.path.isfile(element) and shutil.which("git"):
+                        reslt = prompt("There already exists a sourcefile: " + element + ". What to do with it? [diff/overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["diff", "overwrite", "exit"]))
+                    else:
+                        reslt = prompt("There's already a source-file/folder: " + element + ". What to do with it? [overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["overwrite", "exit"]))
+                if reslt == 'diff':
+                    subprocess.run(["git", "diff", element, exist_dest]) 
+                    reslt = prompt("What to do with " + element + "? [overwrite/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["overwrite", "exit"]))
+
+                if reslt == "exit":
+                    raise SystemExit
+                elif reslt == 'overwrite':
+                    if os.path.isfile(element):
+                        pathlib.Path.unlink(element)
+                    elif os.path.isdir(element) and os.listdir(element) == 0:
+                        pathlib.Path.rmdir(element)
+                    elif os.path.isdir(element):
+                        print(element + ": ")
+                        for i in os.listdir(element):
+                            print(" -" + str(pathlib.Path(i).absolute()))
+                        reslt = prompt(element + " is not empty. Are you sure you want to remove the entire directory? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+                        if reslt == 'yes':
+                            shutil.rmtree(element)
+                        else:
+                            raise SystemExit
+                    print(element + " removed")        
+        if os.path.isfile(element):
+            shutil.copy2(exist_dest, element)
+            print("Copied to " + str(element))
+        elif os.path.isdir(element):
+            shutil.copytree(exist_dest, element, dirs_exist_ok=True)
+            print("Copied to " + str(element) + " and all it's inner content")
+
+def link_to_dest(dest, src):
     for element in src:
         if not os.path.exists(dest):
-            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [yes/no]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
             if res == "y":
                 os.makedirs(dest)
             else:
                 raise SystemExit
         exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
-        if os.path.isfile(exist_dest):
-            res = prompt("There's already a file in the destination: " + exist_dest + ". Should it be overwritten? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
-            if res == "n":
-                continue
-        if os.path.isfile(exist_dest):
-            shutil.copy2(exist_dest, element)
-            print("Copied to " + str(element))
+        if os.path.exists(exist_dest):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    if os.path.islink(element):
+                        print(element + " is already symlinked. Skipping.")
+                        continue
+                    elif os.path.isfile(exist_dest) and not filecmp.cmp(exist_dest, element) and shutil.which("git"):
+                        reslt = prompt("There's already a file in the destination: " + exist_dest + ". What to do with it? [diff/remove/copy-to-source-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["diff", "remove", "copy-and-remove", "exit"]))
+                    else:
+                        reslt = prompt("There's already a file/folder in the destination: " + exist_dest + ". What to do with it? [remove/copy-to-source-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["remove", "copy-and-remove", "exit"]))
+                if reslt == 'diff':
+                    subprocess.run(["git", "diff", element, exist_dest]) 
+                    reslt = prompt("What to do with " + exist_dest + "? [remove/copy-to-source-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["remove", "copy-and-remove", "exit"]))
 
-        elif os.path.isdir(exist_dest):
-            shutil.copytree(exist_dest, element, dirs_exist_ok=True)
-            print("Copied to " + str(element) + " and all it's inner content")
+                if reslt == 'copy-and-remove':
+                    copy_from_dest(dest, src)
+                    reslt='remove'
+
+                if reslt == "exit":
+                    raise SystemExit 
+                elif reslt == 'remove':
+                    if os.path.isfile(exist_dest):
+                        pathlib.Path.unlink(exist_dest)
+                    elif os.path.isdir(exist_dest) and os.listdir(exist_dest) == 0:
+                        pathlib.Path.rmdir(exist_dest)
+                    elif os.path.isdir(exist_dest):
+                        print(exist_dest + ": ")
+                        for i in os.listdir(exist_dest):
+                            print(" -" + str(pathlib.Path(i).absolute()))
+                        reslt = prompt(exist_dest + " is not empty. Are you sure you want to remove the entire directory? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+                        if reslt == 'yes':
+                            shutil.rmtree(exist_dest)
+                        else:
+                            raise SystemExit        
+                    print(exist_dest + " removed")
+        if not os.path.islink(element):                                 
+            if os.path.isfile(element):
+                os.symlink(element, exist_dest)
+                print("Symlinked " + str(element) + " to " + str(exist_dest))
+            elif os.path.isdir(element):
+                os.symlink(element, exist_dest, True)
+                print("Symlinked " + str(element) + " to " + str(exist_dest))
+
+def link_from_dest(dest, src):
+    for element in src:
+        if not os.path.exists(dest):
+            res = prompt("The destination " + dest + " does not exist. Do you want to create it? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            if res == "y":
+                os.makedirs(dest)
+            else:
+                raise SystemExit
+        exist_dest=os.path.join(dest, os.path.basename(os.path.normpath(element)))
+        if os.path.exists(element):
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    reslt = repo.config_reader().get_value("copy-to", "overwrite")
+                except:
+                    if os.path.islink(exist_dest):
+                        print(exist_dest + " is already symlinked. Skipping.")
+                        continue
+                    elif os.path.isfile(element) and not filecmp.cmp(exist_dest, element) and shutil.which("git"):
+                        reslt = prompt("There's already a file in the source: " + element + ". What to do with it? [diff/remove/copy-to-destination-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["diff", "remove", "copy-and-remove", "exit"]))
+                    else:
+                        reslt = prompt("There's already a file/folder in the source: " + element + ". What to do with it? [remove/copy-to-destination-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["remove", "copy-and-remove", "exit"]))
+                
+                    if reslt == 'diff':
+                        subprocess.run(["git", "diff", element, exist_dest]) 
+                        reslt = prompt("What to do with " + element + "? [remove/copy-to-destination-and-remove/exit]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["remove", "copy-and-remove", "exit"]))
+
+                    if reslt == 'copy-and-remove':
+                        copy_to_dest(dest, src)
+                        reslt='remove'
+
+                    if reslt == "exit":
+                        raise SystemExit 
+                    elif reslt == 'remove':
+                        if os.path.isfile(element):
+                            pathlib.Path.unlink(element)
+                        elif os.path.isdir(element) and os.listdir(element) == 0:
+                            pathlib.Path.rmdir(element)
+                        elif os.path.isdir(element):
+                            print(element + ": ")
+                            for i in os.listdir(element):
+                                print(" -" + str(pathlib.Path(i).absolute()))
+                            reslt = prompt(element + " is not empty. Are you sure you want to remove the entire directory? [yes/no(exit)]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
+                            if reslt == 'yes':
+                                shutil.rmtree(element)
+                            else:
+                                raise SystemExit
+                        print(element + " removed")
+                    else:
+                        raise SystemExit
+                        
+        if not os.path.islink(exist_dest):                       
+            if os.path.isfile(exist_dest):        
+                os.symlink(exist_dest, element)
+                print("Symlinked " + str(exist_dest) + " to " + str(element))
+            elif os.path.isdir(exist_dest):
+                os.symlink(exist_dest, element, True)
+                print("Symlinked " + str(exist_dest) + " to " + str(element))
 
 
 def listAll():
@@ -489,16 +651,16 @@ def get_source_num(group):
 
 def get_group_subparsers(subparser):
     add_to_group = subparser.add_parser('add-to-group')
-    delete_from_group = subparser.add_parser('delete-from-group')
+    remove_from_group = subparser.add_parser('remove-from-group')
     add_group_parser = add_to_group.add_subparsers(dest='group')
-    delete_group_parser = delete_from_group.add_subparsers(dest='group')
+    remove_group_parser = remove_from_group.add_subparsers(dest='group')
     names_add = {}
     names_del = {}
     for name, value in conf.envs.items():
         if name == 'group':
             for i in value:
                 add_parser = add_group_parser.add_parser(i)
-                delete_parser = delete_group_parser.add_parser(i)
+                remove_parser = remove_group_parser.add_parser(i)
                 names_add[i]=[]
                 names_del[i]=[]
                 for e in get_reg_names():
@@ -507,11 +669,11 @@ def get_group_subparsers(subparser):
                     elif e in conf.envs['group'][i]:
                         names_del[i].append(e)
                 add_parser.add_argument("name" , nargs='+', help="Group name holding multiple configuration names", metavar="Group name", choices=names_add[i])
-                delete_parser.add_argument("name" , nargs='+', help="Configuration name", metavar="Configuration name(s)", choices=names_del[i])
-    return add_to_group,delete_from_group
+                remove_parser.add_argument("name" , nargs='+', help="Configuration name", metavar="Configuration name(s)", choices=names_del[i])
+    return add_to_group,remove_from_group
 
 
-def cpt_run(name):
+def cpt_to_dest(name):
     if name == ['none']:
         raise SystemExit
     if name == ['all']:
@@ -520,7 +682,7 @@ def cpt_run(name):
                 print('\n' + i + ':')
                 dest = conf.envs[i]['dest']
                 src = conf.envs[i]['src']
-                copy_to(dest, src)
+                copy_to_dest(dest, src)
     else:
         var = []
         grps = []
@@ -546,9 +708,47 @@ def cpt_run(name):
             print('\n' + i + ':')
             dest = conf.envs[i]['dest']
             src = conf.envs[i]['src']
-            copy_to(dest, src)
+            copy_to_dest(dest, src)
 
-def cpt_run_reverse(name):
+def symlink_to_dest(name):
+    if name == ['none']:
+        raise SystemExit
+    if name == ['all']:
+        for i in conf.envs:
+            if not i == 'group':
+                print('\n' + i + ':')
+                dest = conf.envs[i]['dest']
+                src = conf.envs[i]['src']
+                link_to_dest(dest, src)
+    else:
+        var = []
+        grps = []
+        for key in name:
+            if key in conf.envs['group']:
+                var.append(conf.envs['group'][key])
+                grps.append(key)
+        var1=[]
+        for i in var:
+            for e in i:
+                var1.append(e)
+        for key in name:
+            if not key in grps:
+                var1.append(key)
+        var1 = filterListDoubles(var1)
+        for key in var1:     
+            if not key in conf.envs:
+                print("Look again. " + key + " is not known. ")
+                listAllNames()
+                raise SystemExit
+        for i in var1:
+            i=str(i)
+            print('\n' + i + ':')
+            dest = conf.envs[i]['dest']
+            src = conf.envs[i]['src']
+            link_to_dest(dest, src)
+
+
+def cpt_from_dest(name):
     if name == ['none']:
         raise SystemExit
     elif name == ['all']:
@@ -557,7 +757,7 @@ def cpt_run_reverse(name):
                 print('\n' + i + ':')
                 dest = conf.envs[i]['dest']
                 src = conf.envs[i]['src']
-                copy_from(dest, src)
+                copy_from_dest(dest, src)
     else:
         var = []
         grps = []
@@ -583,7 +783,45 @@ def cpt_run_reverse(name):
             print('\n' + i + ':')
             dest = conf.envs[i]['dest']
             src = conf.envs[i]['src']
-            copy_from(dest, src)
+            copy_from_dest(dest, src)
+
+def symlink_from_dest(name):
+    if name == ['none']:
+        raise SystemExit
+    if name == ['all']:
+        for i in conf.envs:
+            if not i == 'group':
+                print('\n' + i + ':')
+                dest = conf.envs[i]['dest']
+                src = conf.envs[i]['src']
+                link_from_dest(dest, src)
+    else:
+        var = []
+        grps = []
+        for key in name:
+            if key in conf.envs['group']:
+                var.append(conf.envs['group'][key])
+                grps.append(key)
+        var1=[]
+        for i in var:
+            for e in i:
+                var1.append(e)
+        for key in name:
+            if not key in grps:
+                var1.append(key)
+        var1 = filterListDoubles(var1)
+        for key in var1:     
+            if not key in conf.envs:
+                print("Look again. " + key + " is not known. ")
+                listAllNames()
+                raise SystemExit
+        for i in var1:
+            i=str(i)
+            print('\n' + i + ':')
+            dest = conf.envs[i]['dest']
+            src = conf.envs[i]['src']
+            link_from_dest(dest, src)
+
 
 def prompt_autocomplete():
     app = get_app()
@@ -593,7 +831,7 @@ def prompt_autocomplete():
     else:
         b.start_completion(select_first=False)
 
-def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
+def ask_git(prmpt="Setup git configuration to copy objects between? [yes/no]: "):
     res = "all"
     repo = git.Repo("./" , search_parent_directories=True)
     names = []
@@ -612,7 +850,7 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         res = os.path.realpath(os.path.expanduser(res))
         if not os.path.exists(res):
             print("The file %s does not exist!" % res)
-            res1 = prompt("Do you want to create " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            res1 = prompt("Do you want to create " + res + "? [yes/no]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
             if res1 == "y":
                 try:
                     if not os.path.exists(os.path.dirname(res)):
@@ -635,87 +873,81 @@ def ask_git(prmpt="Setup git configuration to copy objects between? [y/n]: "):
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "file", res)
         print("Added file = " + str(res) + " to local git configuration")
-        res = prompt("Run: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
+        res = prompt("Name(s): (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
         with repo.config_writer() as confw:
-            confw.set_value("copy-to", "run", res)
-        print("Added run = " + str(res) + " to local git configuration")
-        res = prompt("Overwrite existing files?: (prevents prompt - y(es) / n(o)): ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+            confw.set_value("copy-to", "name", res)
+        print("Added copy-to = " + str(res) + " to local git configuration")
+        res = prompt("Overwrite existing files?: (prevents prompt - yes / no): ", pre_run=prompt_autocomplete, completer=WordCompleter(["yes", "no"]))
         with repo.config_writer() as confw:
             confw.set_value("copy-to", "overwrite", res)
         print("Added overwrite = " + str(res) + " to local git configuration")
         return res
     else:
-        res1 = prompt("You selected no. Prevent this popup from coming up again? [y/n]:", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+        res1 = prompt("You selected no. Prevent this popup from coming up again? [yes/no]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
         if res1 == 'y':
            with repo.config_writer() as confw:
-                confw.set_value("copy-to", "run", "none")
-           print("Added run = none to local git configuration")
+                confw.set_value("copy-to", "name", "none")
+           print("Added name = none to local git configuration")
         return False
 
 def main():
     choices = argcomplete.completers.ChoicesCompleter
     parser = argparse.ArgumentParser(description="Setup configuration to copy files and directories to",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
-    parser.add_argument("-f","--file", type=lambda x: is_valid_conf(parser, x), required=False, help="Configuration file", metavar="Configuration file", default=conf.file)
+     
     subparser = parser.add_subparsers(dest='command')
     list1 = subparser.add_parser('list')
-    run = subparser.add_parser('run')
-    run_reverse = subparser.add_parser('run-reverse')
+    copy_to = subparser.add_parser('copy-to')
+    copy_from = subparser.add_parser('copy-from')
+    symlink_from = subparser.add_parser('symlink-from')
+    symlink_to = subparser.add_parser('symlink-to')
     add = subparser.add_parser('add')
-    delete = subparser.add_parser('delete')
+    remove = subparser.add_parser('remove')
     add_source = subparser.add_parser('add-source')
     set_source_path = get_sourcepath_subparsers(subparser)
-    add_to_group, delete_from_group = get_group_subparsers(subparser)
+    add_to_group, remove_from_group = get_group_subparsers(subparser)
     if shutil.which("git"):
         set_git = subparser.add_parser('set-git')
     add_group = subparser.add_parser('add-group')
-    delete_group = subparser.add_parser('delete-group')
+    remove_group = subparser.add_parser('remove-group')
     reset_destination = subparser.add_parser('reset-destination')
-    delete_source = subparser.add_parser('delete-source')
+    remove_source = subparser.add_parser('remove-source')
     reset_source = subparser.add_parser('reset-source')
     help1 = subparser.add_parser('help')
     list1.add_argument("name" , nargs='?', type=lambda x: is_names_or_group(parser, x), help="Configuration names or groups", metavar="Configuration names or groups", choices=get_list_names(True))
     
-    run.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    run_reverse.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
-    
-    add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration name")
-    add.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory")
-    add.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
-    
-    delete.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
-   
-    #set_source_path.add("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name", choices=get_reg_names())
-    #set_source_path.add("src_num", nargs='*', type=int, metavar="Source files and directories or Index numbers", help="Source files and directories or Index numbers")
+    copy_to.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
+    copy_from.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
+    symlink_to.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
+    symlink_from.add_argument("name" , nargs='?', type=str ,help="Configuration name", metavar="Configuration name", choices=get_names(True))
 
+    add.add_argument("name" , type=lambda x: exist_name(parser, x) ,help="Configuration name", metavar="Configuration name")
+    add.add_argument("dest" , type=pathlib.Path, default=os.path.curdir, metavar="Destination directory")
+    add.add_argument("src" , nargs='*', type=argparse.FileType('r'), metavar="Source files and directories", help="Source files and directories")
+    
+    remove.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+   
     add_group.add_argument("groupname" , type=lambda x: exist_name(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name")
     add_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x) ,help="Configuration name", metavar="Configuration name", choices=get_reg_names())
 
-    delete_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    
-    #add_to_group.add_argument("groupname", type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    #add_to_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
-
-    #delete_from_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x), help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
-    #delete_from_group.add_argument("name" , nargs='+', type=lambda x: is_valid_name(parser, x), help="Configuration name", metavar="Configuration name", choices=get_reg_names())
+    remove_group.add_argument("groupname" , type=lambda x: is_valid_group(parser, x) ,help="Group name holding multiple configuration names", metavar="Group name", choices=get_group_names())
     
     if shutil.which("git"):
         git_command = set_git.add_subparsers(dest='gitcommand')
-        git_run = git_command.add_parser('run')
+        git_run = git_command.add_parser('copy-to')
         git_run.add_argument("value" , nargs='?' ,type=str , help="Configuration name", metavar="Configuration name", choices=get_names(True))
         git_file = git_command.add_parser('file')
-        git_file.add_argument("value" , nargs='1' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
+        git_file.add_argument("value" , nargs='?' ,type=lambda x: is_valid_conf(parser, x) , help="Configuration file", metavar="Configuration file")
         git_overwrite = git_command.add_parser('overwrite')
-        git_overwrite.add_argument("value" , nargs='1' ,type=str , help="Overwrite files?", metavar="Configuration file", choices=['y','n'])
+        git_overwrite.add_argument("value" , nargs='?' ,type=str , help="Overwrite files?", metavar="Configuration file", choices=['yes','no'])
         
     
     add_source.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
-    add_source.add_argument("src" , nargs='+', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
+    add_source.add_argument("src" , nargs='+', type=argparse.FileType('r'), metavar="Source files and directories", help="Source files and directories")
 
     reset_destination.add_argument("name" , type=str ,help="Configuration name for modifications", metavar="Configuration name",  choices=get_reg_names())
-    reset_destination.add_argument("dest" , type=lambda x: is_valid_dir(parser, x), metavar="Destination directory", help="Destination directory")
+    reset_destination.add_argument("dest" , type=pathlib.Path, default=os.path.curdir, metavar="Destination directory", help="Destination directory")
 
-    name_parser = delete_source.add_subparsers(dest='name')
+    name_parser = remove_source.add_subparsers(dest='name')
     reset_name_parser = reset_source.add_subparsers(dest='name')
     numbers = {}
     for name, value in conf.envs.items():
@@ -738,10 +970,15 @@ def main():
             del_source_parser.add_argument("src_num" , nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers[name]) 
             reset_source_parser.add_argument("src_num" , nargs='+', help="Source number/Source Number Range", metavar="Source number/Source Number Range", choices=numbers[name])
 
-    reset_source.add_argument("src" , nargs='*', type=lambda x: is_valid_file_or_dir(parser, x), metavar="Source files and directories", help="Source files and directories")
+    reset_source.add_argument("src" , nargs='*', type=argparse.FileType('r'), metavar="Source files and directories", help="Source files and directories")
     output_stream = None
     if "_ARGCOMPLETE_POWERSHELL" in os.environ:
         output_stream = codecs.getwriter("utf-8")(sys.stdout.buffer)
+
+    parser.add_argument("-l", "--list", action='store_true', required=False, help="List configuration")
+    parser.add_argument("-f","--file", type=lambda x: is_valid_conf(parser, x), required=False, help="Configuration file", metavar="Configuration file", default=conf.file)
+    parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__)) 
+
 
     argcomplete.autocomplete(parser, output_stream=output_stream)
     """
@@ -767,20 +1004,20 @@ def main():
      
 
     if args.command == 'help':
-        print("Positional argument 'run' to run config by name")
+        print("Copy or symlink (or both) from a config using userdefined names")
         parser.print_help()
         raise SystemExit
 
-    elif args.command == 'run':
+    elif args.command == 'copy-to':
         if not args.name:
             if is_git_repo("./"):
                 repo = git.Repo("./", search_parent_directories=True)
                 try:
-                    res = repo.config_reader().get_value("copy-to", "run")
+                    res = repo.config_reader().get_value("copy-to", "name")
                 except:
-                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
+                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [yes/no]: ")
                 if res:
-                    cpt_run(res.split())
+                    cpt_to_dest(res.split())
                     if args.list:
                         listName(res)
             else:
@@ -790,19 +1027,19 @@ def main():
             print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
             raise SystemExit
         else:
-            cpt_run(name.split())
+            cpt_to_dest(name.split())
             if args.list:
                 listName(name)
-    elif args.command == 'run-reverse':
+    elif args.command == 'copy-from':
         if not args.name:
             if is_git_repo("./"):
                  res = 'all'
                  try:
-                    res = repo.config_reader().get_value("copy-to", "run")
+                    res = repo.config_reader().get_value("copy-to", "name")
                  except:
-                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [y/n]: ")
+                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [yes/no]: ")
                  if res:
-                    cpt_run_reverse(res.split())
+                    cpt_from_dest(res.split())
                     if args.list:
                         listName(res)
             else:
@@ -812,14 +1049,58 @@ def main():
             print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
             raise SystemExit   
         else:
-            cpt_run_reverse(name.split())
+            cpt_from_dest(name.split())
             if args.list:
                 listName(name)
+    elif args.command == 'symlink-to':
+        if not args.name:
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    res = repo.config_reader().get_value("copy-to", "name")
+                except:
+                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [yes/no]: ")
+                if res:
+                    symlink_to_dest(res.split())
+                    if args.list:
+                        listName(res)
+            else:
+                print("No name given and not in a git repository with config. Give up an configuration to copy objects between")
+                raise SystemExit   
+        elif conf.envs == {} or conf.envs == {"group": []}:
+            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
+            raise SystemExit
+        else:
+            symlink_to_dest(name.split())
+            if args.list:
+                listName(name)
+    elif args.command == 'symlink-from':
+        if not args.name:
+            if is_git_repo("./"):
+                repo = git.Repo("./", search_parent_directories=True)
+                try:
+                    res = repo.config_reader().get_value("copy-to", "name")
+                except:
+                    res = ask_git("No name given but in a git repository. Setup git configuration to copy objects between? [yes/no]: ")
+                if res:
+                    symlink_from_dest(res.split())
+                    if args.list:
+                        listName(res)
+            else:
+                print("No name given and not in a git repository with config. Give up an configuration to copy objects between")
+                raise SystemExit   
+        elif conf.envs == {} or conf.envs == {"group": []}:
+            print("Add an configuration with 'copy-to add dest src' first to copy all it's files to destination")
+            raise SystemExit
+        else:
+            symlink_from_dest(name.split())
+            if args.list:
+                listName(name)            
     elif args.command == 'set-git':
         if not args.gitcommand:
-            args.gitcommand = prompt("Give up a git value to set (run/file/overwrite): ", pre_run=prompt_autocomplete, completer=WordCompleter(["run", "file", 'overwrite']))
+            args.gitcommand = prompt("Give up a git value to set (name/file/overwrite): ", pre_run=prompt_autocomplete, completer=WordCompleter(["name", "file", 'overwrite']))
 
-        if args.gitcommand == 'run':
+        if args.gitcommand == 'name':
            repo = git.Repo("./", search_parent_directories=True)
            res = "all"
            names = []
@@ -827,13 +1108,13 @@ def main():
                for name, value in conf.envs.items():
                     if not name == 'group':
                         names.append(str(name))
-               res = prompt("Run: (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
+               res = prompt("Name(s): (Spaces for multiple - Empty: all): ", pre_run=prompt_autocomplete, completer=WordCompleter(names))
                if res == '':
                    res = "all"
            else:
                res = args.value
            with repo.config_writer() as confw:
-               confw.set_value("copy-to", "run", res)
+               confw.set_value("copy-to", "name", res)
            if args.list:
                 listName(res)
            print("Added " + str(res) + " to local git configuration")
@@ -849,7 +1130,7 @@ def main():
            res = os.path.realpath(os.path.expanduser(res))
            if not os.path.exists(res):
                 print("The file %s does not exist!" % res)
-                res1 = prompt("Do you want to create it " + res + "? [y/n]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
+                res1 = prompt("Do you want to create it " + res + "? [yes/no]: ", pre_run=prompt_autocomplete, completer=WordCompleter(["y", "n"]))
                 if res1 == "y":
                     try:
                         if not os.path.exists(os.path.dirname(res)):
@@ -872,10 +1153,10 @@ def main():
            with repo.config_writer() as confw:
                confw.set_value("copy-to", "file", res)
            print("Added " + str(res) + " to local git configuration")
-       elif args.gitcommand == 'overwrite':
+        elif args.gitcommand == 'overwrite':
            repo = git.Repo("./", search_parent_directories=True)
            with repo.config_writer() as confw:
-               confw.set_value("copy-to", "run", args.value)
+               confw.set_value("copy-to", "overwrite", args.value)
 
     elif args.command == 'add':
         if not 'name' in args:
@@ -895,7 +1176,18 @@ def main():
         elif str(dest) in src:
             print("Destination and source can't be one and the same")
             raise SystemExit
+        elif not pathlib.Path(args.dest).absolute().exists():
+            raise FileNotFoundError("The directory %s does not exist!" % dest)
+        elif not pathlib.Path(args.dest).is_dir():
+            raise NotADirectoryError(dest)
+        elif type(args.src[0]) == 'TextIOWrapper' and not all(os.path.exists(str(i.name)) for i in args.src):
+
+            raise FileNotFoundError("The file/directory %s does not exist!" % all(os.path.exists(str(i.name)) for i in args.src))
         else:
+            if str(type(args.src[0])) == "<class '_io.TextIOWrapper'>":
+                src=[]
+                for i in args.src:
+                    src.append(str(os.path.abspath(i.name)))
             with open(conf.file, 'w') as outfile: 
                 conf.envs[str(name)] = { 'dest' : str(dest), 'src' : [*src] }
                 json.dump(conf.envs, outfile)
@@ -986,7 +1278,7 @@ def main():
                 listName(args.group)
             print(str(args.name) + ' added to ' + str(args.group))
 
-    elif args.command == 'delete':
+    elif args.command == 'remove':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
@@ -1010,7 +1302,7 @@ def main():
             with open(conf.file, 'w') as outfile:
                 json.dump(conf.envs, outfile)
     
-    elif args.command == 'delete-group':
+    elif args.command == 'remove-group':
         if not 'groupname' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
@@ -1029,7 +1321,7 @@ def main():
             with open(conf.file, 'w') as outfile:
                 json.dump(conf.envs, outfile)
     
-    elif args.command == 'delete-from-group':
+    elif args.command == 'remove-from-group':
         if not 'group' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
@@ -1108,12 +1400,12 @@ def main():
                 listName(name)
             print('Reset destination of '+ str(name) +' to', dest)
     
-    elif args.command == 'delete-source':
+    elif args.command == 'remove-source':
         if not 'name' in args:
             print("Give up an configuration to copy objects between")
             raise SystemExit
         elif not 'src_num' in args:
-            print("Give up the indices of the directories and files to be deleted from configuration")
+            print("Give up the indices of the directories and files to be removed from configuration")
             raise SystemExit
         elif conf.envs == {} or os.stat(conf.file).st_size == 0:
             print("Add an configuration with add first to copy all it's files to destination")
@@ -1135,10 +1427,10 @@ def main():
                         print("One of the given numbers exceeds the amount of sources for " + str(args.name))
                         raise SystemExit
                     src = conf.envs[name]['src']
-                    for j in range(int(nums[0]),int(nums[1])+1):
+                    for j in reversed(range(int(nums[0]),int(nums[1])+1)):
                         name_src = src[int(j)-1]
                         src.pop(int(j) - 1)
-                        print('Deleted source of '+ str(name) + " " + str(j) + ' - ' + str(name_src))
+                        print('Releted source from'+ str(name) + " " + str(j) + ' - ' + str(name_src))
                 else:
                     i = int(i)
                     if i > len(conf.envs[name]['src']):
@@ -1147,7 +1439,7 @@ def main():
                     src = conf.envs[name]['src']
                     name_src = src[int(i)-1]
                     src.pop(int(i) - 1)
-                    print('Deleted source of '+ str(name) + " " + str(i) + ' - ' + str(name_src))
+                    print('Removed source from'+ str(name) + " " + str(i) + ' - ' + str(name_src))
             with open(conf.file, 'w') as outfile:
                 conf.envs[name].update({ "src" : [*src] })
                 json.dump(conf.envs, outfile)

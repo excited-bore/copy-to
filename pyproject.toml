@@ -3,7 +3,7 @@ requires = ["setuptools","argcomplete", "GitPython", "prompt_toolkit"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "copy-to"
-version = "1.4.6"
+version = "1.4.8"
 authors = [
   { name="Excited Bore", email="brunt-curry-wobble@duck.com" },
 ]
@@ -25,4 +25,3 @@ copy-to = "copy_to:main"
 [project.urls]
 "Homepage" = "https://github.com/excited-bore/copy-to"
 "Bug Tracker" = "https://github.com/excited-bore/copy-to/issues"
-

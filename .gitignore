@@ -9,4 +9,5 @@ tags/
 PKG-INFO/
 setup.cfg/
 coc-settings.json
+pyvenv.cfg
 confs.json
